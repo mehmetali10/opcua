@@ -139,10 +139,40 @@ type SecureChannel struct {
 	// errorCh receive dispatcher errors
 	errCh chan<- error
 
+	// required for the server channel
+
+	// secureChannelID is a unique identifier for the SecureChannel assigned by the Server.
+	// If a Server receives a SecureChannelId which it does not recognize it shall return an
+	// appropriate transport layer error.
+	//
+	// When a Server starts the first SecureChannelId used should be a value that is likely to
+	// be unique after each restart. This ensures that a Server restart does not cause
+	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
+	// to them.
+	secureChannelID uint32
+
+	// sequenceNumber is a monotonically increasing sequence number assigned by the sender to each
+	// MessageChunk sent over the SecureChannel.
+	sequenceNumber uint32
+
+	// securityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
+	// This identifier is returned by the Server in an OpenSecureChannel response Message.
+	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
+	// transport layer error.
+	securityTokenID uint32
+
 	closeOnce sync.Once
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
+	return newSecureChannel(endpoint, c, cfg, errCh, 0, 0, 0)
+}
+
+func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
+	return newSecureChannel(endpoint, c, cfg, errCh, secureChannelID, sequenceNumber, securityTokenID)
+}
+
+func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
@@ -167,18 +197,21 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 	}
 
 	s := &SecureChannel{
-		endpointURL:  endpoint,
-		c:            c,
-		cfg:          cfg,
-		requestID:    cfg.RequestIDSeed,
-		reqLocker:    newConditionLocker(),
-		rcvLocker:    newConditionLocker(),
-		errCh:        errCh,
-		closing:      make(chan struct{}),
-		disconnected: make(chan struct{}),
-		instances:    make(map[uint32][]*channelInstance),
-		chunks:       make(map[uint32][]*MessageChunk),
-		handlers:     make(map[uint32]chan *MessageBody),
+		endpointURL:     endpoint,
+		c:               c,
+		cfg:             cfg,
+		requestID:       cfg.RequestIDSeed,
+		secureChannelID: secureChannelID,
+		sequenceNumber:  sequenceNumber,
+		securityTokenID: securityTokenID,
+		reqLocker:       newConditionLocker(),
+		rcvLocker:       newConditionLocker(),
+		errCh:           errCh,
+		closing:         make(chan struct{}),
+		disconnected:    make(chan struct{}),
+		instances:       make(map[uint32][]*channelInstance),
+		chunks:          make(map[uint32][]*MessageChunk),
+		handlers:        make(map[uint32]chan *MessageBody),
 	}
 
 	return s, nil
@@ -206,7 +239,7 @@ func (s *SecureChannel) dispatcher() {
 		case <-s.closing:
 			return
 		default:
-			msg := s.receive(ctx)
+			msg := s.Receive(ctx)
 			if msg.Err != nil {
 				select {
 				case <-s.closing:
@@ -254,10 +287,10 @@ func (s *SecureChannel) dispatcher() {
 	}
 }
 
-// receive receives message chunks from the secure channel, decodes and forwards
+// Receive receives message chunks from the secure channel, decodes and forwards
 // them to the registered callback channel, if there is one. Otherwise,
 // the message is dropped.
-func (s *SecureChannel) receive(ctx context.Context) *MessageBody {
+func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 	for {
 		select {
 		case <-ctx.Done():
@@ -484,6 +517,7 @@ func (s *SecureChannel) Open(ctx context.Context) error {
 }
 
 func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, requestType ua.SecurityTokenRequestType) error {
+	debug.Printf("sc.open")
 	defer s.rcvLocker.unlock()
 
 	s.openingMu.Lock()
@@ -528,6 +562,9 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	}
 
 	s.openingInstance = newChannelInstance(s)
+	s.openingInstance.secureChannelID = s.secureChannelID
+	s.openingInstance.sequenceNumber = s.sequenceNumber
+	s.openingInstance.securityTokenID = s.securityTokenID
 
 	if requestType == ua.SecurityTokenRequestTypeRenew {
 		// TODO: lock? sequenceNumber++?
@@ -573,6 +610,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChannelResponse, localNonce []byte, instance *channelInstance) (err error) {
+	debug.Printf("sc.handleOpenSecureChannelResponse")
 	instance.state = channelActive
 	instance.secureChannelID = resp.SecurityToken.ChannelID
 	instance.securityTokenID = resp.SecurityToken.TokenID
@@ -847,6 +885,51 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	}
 
 	return resp, nil
+}
+
+func (s *SecureChannel) SendResponseWithContext(ctx context.Context, resp ua.Response) error {
+	typeID := ua.ServiceTypeID(resp)
+	if typeID == 0 {
+		return errors.Errorf("uasc: unknown service %T. Did you call register?", resp)
+	}
+
+	instance, err := s.getActiveChannelInstance()
+	if err != nil {
+		return err
+	}
+
+	// encode the message
+	m := instance.newMessage(resp, typeID, instance.sc.requestID)
+	reqid := m.SequenceHeader.RequestID
+	b, err := m.Encode()
+	if err != nil {
+		return err
+	}
+
+	// encrypt the message prior to sending it
+	// if SecurityMode == None, this returns the byte stream untouched
+	b, err = instance.signAndEncrypt(m, b)
+	if err != nil {
+		return err
+	}
+
+	// send the message
+	n, err := s.c.Write(b)
+	if err != nil {
+		return err
+	}
+
+	// todo(fs): what if len(b) != n? Can this happen?
+	if len(b) != n {
+		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", resp, len(b), n)
+	}
+
+	atomic.AddUint64(&instance.bytesSent, uint64(n))
+	atomic.AddUint32(&instance.messagesSent, 1)
+
+	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqid, resp, len(b))
+
+	return nil
 }
 
 func (s *SecureChannel) nextRequestID() uint32 {

@@ -1,102 +1,109 @@
-//go:build integration
-// +build integration
-
 package uatest
 
 import (
-	"net"
+	"context"
+	"crypto/rsa"
+	"crypto/tls"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"time"
+	"testing"
 
-	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/ua"
 )
 
-// Server runs a python test server.
-type Server struct {
-	// Path is the path to the Python server.
-	Path string
+const (
+	serverCertFile string = "test/server_cert.pem"
+	serverKeyFile  string = "test/server_key.pem"
 
-	// Endpoint is the endpoint address which will be set
-	// after the server has started.
-	Endpoint string
+	authUser string = "test"
+	authPass string = "test"
+)
 
-	// Opts contains the client options required to connect to the server.
-	// They are valid after the server has been started.
-	Opts []opcua.Option
+type GoServer struct {
+	ext    bool
+	extURL string
 
-	cmd    *exec.Cmd
-	waitch chan error
+	// closeFunc is a teardown function called by Close()
+	// Using a closure allows for more control of the inner workings of the function
+	closeFunc func()
+
+	s *server.Server
 }
 
-// NewServer creates a test server and starts it. The function
-// panics if the server cannot be started.
-func NewServer(path string) *Server {
-	s := &Server{Path: path, waitch: make(chan error)}
-	if err := s.Run(); err != nil {
-		panic(err)
+// Close gracefully shuts down the server
+func (s *GoServer) Close() {
+	if s.closeFunc != nil {
+		s.closeFunc()
 	}
-	return s
 }
 
-func (s *Server) Run() error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
+func (s *GoServer) URL() string {
+	if s.ext {
+		return s.extURL
 	}
-	path := filepath.Join(wd, s.Path)
 
-	py, err := exec.LookPath("python3")
+	return s.s.URL()
+}
+
+func NewGoServer(t *testing.T) *GoServer {
+	extServer := os.Getenv("OPC_EXTERNALSERVER")
+	if extServer != "" {
+
+		return &GoServer{
+			ext:       true,
+			extURL:    extServer,
+			closeFunc: func() {},
+		}
+	}
+
+	var opts []server.Option
+
+	opts = append(opts,
+		server.EnableSecurity("None", ua.MessageSecurityModeNone),
+		server.EnableSecurity("Basic128Rsa15", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Basic128Rsa15", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Basic256", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Basic256", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Aes128_Sha256_RsaOaep", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Aes128_Sha256_RsaOaep", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Aes256_Sha256_RsaPss", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Aes256_Sha256_RsaPss", ua.MessageSecurityModeSignAndEncrypt),
+	)
+
+	opts = append(opts,
+		server.EnableAuthMode(ua.UserTokenTypeAnonymous),
+		server.EnableAuthMode(ua.UserTokenTypeUserName),
+		server.EnableAuthMode(ua.UserTokenTypeCertificate),
+	)
+
+	c, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
 	if err != nil {
-		// fallback to python and hope it still points to a python3 version.
-		// the Windows python3 installer doesn't seem to create a `python3.exe`
-		py, err = exec.LookPath("python")
+		t.Errorf("Failed to load certificate: %s", err)
+	} else {
+		pk, ok := c.PrivateKey.(*rsa.PrivateKey)
+		if !ok {
+			t.Errorf("Invalid private key")
+		}
+		cert := c.Certificate[0]
+		opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))
+	}
+
+	s := server.New("", opts...)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := s.Start(ctx); err != nil {
+		t.Fatalf("Error starting server, exiting: %s", err)
+	}
+
+	teardown := func() {
+		cancel()
+		err := s.Close()
 		if err != nil {
-			return errors.Errorf("unable to find Python executable")
+			t.Errorf("Error shutting down server: %s", err)
 		}
 	}
 
-	s.cmd = exec.Command(py, path)
-	s.cmd.Stdout = os.Stdout
-	s.cmd.Stderr = os.Stderr
-	s.Endpoint = "opc.tcp://127.0.0.1:4840"
-	s.Opts = []opcua.Option{opcua.SecurityMode(ua.MessageSecurityModeNone)}
-	if err := s.cmd.Start(); err != nil {
-		return err
-	}
-	go func() { s.waitch <- s.cmd.Wait() }()
-
-	// wait until endpoint is available
-	errch := make(chan error)
-	go func() {
-		deadline := time.Now().Add(10 * time.Second)
-		for time.Now().Before(deadline) {
-			c, err := net.Dial("tcp", "127.0.0.1:4840")
-			if err != nil {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			c.Close()
-			errch <- nil
-		}
-		errch <- errors.Errorf("timeout")
-	}()
-
-	select {
-	case err := <-s.waitch:
-		return err
-	case err := <-errch:
-		return err
-	}
-}
-
-func (s *Server) Close() error {
-	if s.cmd == nil {
-		return errors.Errorf("not running")
-	}
-	go func() { s.cmd.Process.Kill() }()
-	return <-s.waitch
+	return &GoServer{s: s, closeFunc: teardown}
 }

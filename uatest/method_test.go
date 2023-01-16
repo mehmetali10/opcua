@@ -7,9 +7,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/pascaldekloe/goe/verify"
+
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
-	"github.com/pascaldekloe/goe/verify"
 )
 
 type Complex struct {
@@ -57,7 +58,7 @@ func TestCallMethod(t *testing.T) {
 
 	ctx := context.Background()
 
-	srv := NewServer("method_server.py")
+	srv := NewPythonServer("method_server.py")
 	defer srv.Close()
 
 	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
