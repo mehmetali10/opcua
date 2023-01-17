@@ -361,8 +361,8 @@ func (n *Node) TranslateBrowsePathsToNodeIDsWithContext(ctx context.Context, pat
 	}
 
 	var nodeID *ua.NodeID
-	err := n.c.SendWithContext(ctx, &req, func(i interface{}) error {
-		if resp, ok := i.(*ua.TranslateBrowsePathsToNodeIDsResponse); ok {
+	err := n.c.SendWithContext(ctx, &req, func(v ua.Response) error {
+		if resp, ok := v.(*ua.TranslateBrowsePathsToNodeIDsResponse); ok {
 			if len(resp.Results) == 0 {
 				return ua.StatusBadUnexpectedError
 			}

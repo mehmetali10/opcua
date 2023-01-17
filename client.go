@@ -756,8 +756,8 @@ func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.Session
 
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
-	// use sc.SendRequest() to enforce this.
-	err := sc.SendRequestWithContext(ctx, req, nil, func(v interface{}) error {
+	// use c.SecureChannel().SendRequest() to enforce this.
+	err := c.SecureChannel().SendRequestWithContext(ctx, req, nil, func(v ua.Response) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -873,7 +873,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return sc.SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return c.SecureChannel().SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v ua.Response) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -923,7 +923,7 @@ func (c *Client) closeSession(ctx context.Context, s *Session) error {
 	}
 	req := &ua.CloseSessionRequest{DeleteSubscriptions: true}
 	var res *ua.CloseSessionResponse
-	return c.SendWithContext(ctx, req, func(v interface{}) error {
+	return c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 }
@@ -952,12 +952,12 @@ func (c *Client) DetachSessionWithContext(ctx context.Context) (*Session, error)
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
-func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
+func (c *Client) Send(req ua.Request, h uasc.ResponseHandler) error {
 	return c.SendWithContext(context.Background(), req, h)
 }
 
 // Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (c *Client) SendWithContext(ctx context.Context, req ua.Request, h func(interface{}) error) error {
+func (c *Client) SendWithContext(ctx context.Context, req ua.Request, h uasc.ResponseHandler) error {
 	stats.Client().Add("Send", 1)
 
 	err := c.sendWithTimeout(ctx, req, c.cfg.sechan.RequestTimeout, h)
@@ -969,7 +969,7 @@ func (c *Client) SendWithContext(ctx context.Context, req ua.Request, h func(int
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout time.Duration, h func(interface{}) error) error {
+func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout time.Duration, h uasc.ResponseHandler) error {
 	sc := c.SecureChannel()
 	if sc == nil {
 		return ua.StatusBadServerNotConnected
@@ -1003,7 +1003,7 @@ func (c *Client) GetEndpointsWithContext(ctx context.Context) (*ua.GetEndpointsR
 		EndpointURL: c.endpointURL,
 	}
 	var res *ua.GetEndpointsResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1050,7 +1050,7 @@ func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.
 	req = cloneReadRequest(req)
 
 	var res *ua.ReadResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		err := safeAssign(v, &res)
 		if err != nil {
 			return err
@@ -1089,7 +1089,7 @@ func (c *Client) WriteWithContext(ctx context.Context, req *ua.WriteRequest) (*u
 	stats.Client().Add("NodesToWrite", int64(len(req.NodesToWrite)))
 
 	var res *ua.WriteResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1137,7 +1137,7 @@ func (c *Client) BrowseWithContext(ctx context.Context, req *ua.BrowseRequest) (
 	req = cloneBrowseRequest(req)
 
 	var res *ua.BrowseResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1159,7 +1159,7 @@ func (c *Client) CallWithContext(ctx context.Context, req *ua.CallMethodRequest)
 		MethodsToCall: []*ua.CallMethodRequest{req},
 	}
 	var res *ua.CallResponse
-	err := c.SendWithContext(ctx, creq, func(v interface{}) error {
+	err := c.SendWithContext(ctx, creq, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -1184,7 +1184,7 @@ func (c *Client) BrowseNextWithContext(ctx context.Context, req *ua.BrowseNextRe
 	stats.Client().Add("BrowseNext", 1)
 
 	var res *ua.BrowseNextResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1206,7 +1206,7 @@ func (c *Client) RegisterNodesWithContext(ctx context.Context, req *ua.RegisterN
 	stats.Client().Add("NodesToRegister", int64(len(req.NodesToRegister)))
 
 	var res *ua.RegisterNodesResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1228,7 +1228,7 @@ func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.Unregis
 	stats.Client().Add("NodesToUnregister", int64(len(req.NodesToUnregister)))
 
 	var res *ua.UnregisterNodesResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1258,7 +1258,7 @@ func (c *Client) HistoryReadEventWithContext(ctx context.Context, nodes []*ua.Hi
 	}
 
 	var res *ua.HistoryReadResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1288,7 +1288,7 @@ func (c *Client) HistoryReadRawModifiedWithContext(ctx context.Context, nodes []
 	}
 
 	var res *ua.HistoryReadResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1318,7 +1318,7 @@ func (c *Client) HistoryReadProcessedWithContext(ctx context.Context, nodes []*u
 	}
 
 	var res *ua.HistoryReadResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1348,7 +1348,7 @@ func (c *Client) HistoryReadAtTimeWithContext(ctx context.Context, nodes []*ua.H
 	}
 
 	var res *ua.HistoryReadResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	return res, err

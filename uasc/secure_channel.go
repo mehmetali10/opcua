@@ -27,11 +27,33 @@ const (
 	MaxTimeout      = math.MaxUint32 * time.Millisecond
 )
 
-type response struct {
-	ReqID uint32
-	SCID  uint32
-	V     interface{}
-	Err   error
+// ResponseHandler handles the response of a service request and
+// is used by the client.
+type ResponseHandler func(ua.Response) error
+
+// MessageBody is the content of a secure channel message sent
+// between a client and a server and represents a service
+// request or response.
+type MessageBody struct {
+	RequestID       uint32
+	SecureChannelID uint32
+	Err             error
+
+	body any
+}
+
+func (b MessageBody) Request() ua.Request {
+	if x, ok := b.body.(ua.Request); ok {
+		return x
+	}
+	return nil
+}
+
+func (b MessageBody) Response() ua.Response {
+	if x, ok := b.body.(ua.Response); ok {
+		return x
+	}
+	return nil
 }
 
 type conditionLocker struct {
@@ -100,8 +122,8 @@ type SecureChannel struct {
 	rcvLocker  *conditionLocker
 	pendingReq sync.WaitGroup
 
-	// handles maps request IDs to response channels
-	handlers   map[uint32]chan *response
+	// handles maps requestIDs to response channels
+	handlers   map[uint32]chan *MessageBody
 	handlersMu sync.Mutex
 
 	// chunks maintains a temporary list of chunks for a given request ID
@@ -156,7 +178,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 		disconnected: make(chan struct{}),
 		instances:    make(map[uint32][]*channelInstance),
 		chunks:       make(map[uint32][]*MessageChunk),
-		handlers:     make(map[uint32]chan *response),
+		handlers:     make(map[uint32]chan *MessageBody),
 	}
 
 	return s, nil
@@ -184,48 +206,47 @@ func (s *SecureChannel) dispatcher() {
 		case <-s.closing:
 			return
 		default:
-			resp := s.receive(ctx)
-
-			if resp.Err != nil {
+			msg := s.receive(ctx)
+			if msg.Err != nil {
 				select {
 				case <-s.closing:
 					return
 				default:
 					select {
-					case s.errCh <- resp.Err:
+					case s.errCh <- msg.Err:
 					default:
 					}
 				}
 			}
 
-			if resp.Err == io.EOF {
+			if msg.Err == io.EOF {
 				return
 			}
 
-			if resp.Err != nil {
-				debug.Printf("uasc %d/%d: err: %v", s.c.ID(), resp.ReqID, resp.Err)
+			if msg.Err != nil {
+				debug.Printf("uasc %d/%d: err: %v", s.c.ID(), msg.RequestID, msg.Err)
 			} else {
-				debug.Printf("uasc %d/%d: recv %T", s.c.ID(), resp.ReqID, resp.V)
+				debug.Printf("uasc %d/%d: recv %T", s.c.ID(), msg.RequestID, msg.body)
 			}
 
-			ch, ok := s.popHandler(resp.ReqID)
+			ch, ok := s.popHandler(msg.RequestID)
 
 			if !ok {
-				debug.Printf("uasc %d/%d: no handler for %T", s.c.ID(), resp.ReqID, resp.V)
+				debug.Printf("uasc %d/%d: no handler for %T", s.c.ID(), msg.RequestID, msg.body)
 				continue
 			}
 
 			// HACK
-			if _, ok := resp.V.(*ua.OpenSecureChannelResponse); ok {
+			if _, ok := msg.Response().(*ua.OpenSecureChannelResponse); ok {
 				s.rcvLocker.lock()
 			}
 
-			debug.Printf("uasc %d/%d: sending %T to handler", s.c.ID(), resp.ReqID, resp.V)
+			debug.Printf("uasc %d/%d: sending %T to handler", s.c.ID(), msg.RequestID, msg.body)
 			select {
-			case ch <- resp:
+			case ch <- msg:
 			default:
 				// this should never happen since the chan is of size one
-				debug.Printf("uasc %d/%d: unexpected state. channel write should always succeed.", s.c.ID(), resp.ReqID)
+				debug.Printf("uasc %d/%d: unexpected state. channel write should always succeed.", s.c.ID(), msg.RequestID)
 			}
 
 			s.rcvLocker.waitIfLock()
@@ -236,29 +257,29 @@ func (s *SecureChannel) dispatcher() {
 // receive receives message chunks from the secure channel, decodes and forwards
 // them to the registered callback channel, if there is one. Otherwise,
 // the message is dropped.
-func (s *SecureChannel) receive(ctx context.Context) *response {
+func (s *SecureChannel) receive(ctx context.Context) *MessageBody {
 	for {
 		select {
 		case <-ctx.Done():
-			return &response{Err: ctx.Err()}
+			return &MessageBody{Err: ctx.Err()}
 
 		default:
 			chunk, err := s.readChunk()
 			if err == io.EOF {
 				debug.Printf("uasc %d: readChunk EOF", s.c.ID())
-				return &response{Err: err}
+				return &MessageBody{Err: err}
 			}
 
 			if err != nil {
-				return &response{Err: err}
+				return &MessageBody{Err: err}
 			}
 
 			hdr := chunk.Header
 			reqID := chunk.SequenceHeader.RequestID
 
-			resp := &response{
-				ReqID: reqID,
-				SCID:  chunk.MessageHeader.Header.SecureChannelID,
+			msg := &MessageBody{
+				RequestID:       reqID,
+				SecureChannelID: chunk.MessageHeader.Header.SecureChannelID,
 			}
 
 			debug.Printf("uasc %d/%d: recv %s%c with %d bytes", s.c.ID(), reqID, hdr.MessageType, hdr.ChunkType, hdr.MessageSize)
@@ -273,19 +294,19 @@ func (s *SecureChannel) receive(ctx context.Context) *response {
 				msga := new(MessageAbort)
 				if _, err := msga.Decode(chunk.Data); err != nil {
 					debug.Printf("uasc %d/%d: invalid MSGA chunk. %s", s.c.ID(), reqID, err)
-					resp.Err = ua.StatusBadDecodingError
-					return resp
+					msg.Err = ua.StatusBadDecodingError
+					return msg
 				}
 
-				return &response{ReqID: reqID, Err: ua.StatusCode(msga.ErrorCode)}
+				return &MessageBody{RequestID: reqID, Err: ua.StatusCode(msga.ErrorCode)}
 
 			case 'C':
 				s.chunks[reqID] = append(s.chunks[reqID], chunk)
 				if n := len(s.chunks[reqID]); uint32(n) > s.c.MaxChunkCount() {
 					delete(s.chunks, reqID)
 					s.chunksMu.Unlock()
-					resp.Err = errors.Errorf("too many chunks: %d > %d", n, s.c.MaxChunkCount())
-					return resp
+					msg.Err = errors.Errorf("too many chunks: %d > %d", n, s.c.MaxChunkCount())
+					return msg
 				}
 				s.chunksMu.Unlock()
 				continue
@@ -299,14 +320,17 @@ func (s *SecureChannel) receive(ctx context.Context) *response {
 
 			b, err := mergeChunks(all)
 			if err != nil {
-				resp.Err = err
-				return resp
+				msg.Err = err
+				return msg
 			}
 
 			if uint32(len(b)) > s.c.MaxMessageSize() {
-				resp.Err = errors.Errorf("message too large: %d > %d", uint32(len(b)), s.c.MaxMessageSize())
-				return resp
+				msg.Err = errors.Errorf("message too large: %d > %d", uint32(len(b)), s.c.MaxMessageSize())
+				return msg
 			}
+
+			// todo(fs): Why are we talking about ResponseHeaders here?
+			// todo(fs): this should apply to both requests and responses
 
 			// since we are not decoding the ResponseHeader separately
 			// we need to drop every message that has an error since we
@@ -315,24 +339,24 @@ func (s *SecureChannel) receive(ctx context.Context) *response {
 			// and subsequently remove it and the TypeID from all service
 			// structs and tests. We also need to add a deadline to all
 			// handlers and check them periodically to time them out.
-			_, svc, err := ua.DecodeService(b)
+			_, body, err := ua.DecodeService(b)
 			if err != nil {
-				resp.Err = err
-				return resp
+				msg.Err = err
+				return msg
 			}
 
-			resp.V = svc
+			msg.body = body
 
 			// If the service status is not OK then bubble
 			// that error up to the caller.
-			if r, ok := svc.(ua.Response); ok {
-				if status := r.Header().ServiceResult; status != ua.StatusOK {
-					resp.Err = status
-					return resp
+			if resp := msg.Response(); resp != nil {
+				if status := resp.Header().ServiceResult; status != ua.StatusOK {
+					msg.Err = status
+					return msg
 				}
 			}
 
-			return resp
+			return msg
 		}
 	}
 }
@@ -539,7 +563,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
-	return s.sendRequestWithTimeout(ctx, req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v interface{}) error {
+	return s.sendRequestWithTimeout(ctx, req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v ua.Response) error {
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", v)
@@ -663,7 +687,7 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	instance *channelInstance,
 	authToken *ua.NodeID,
 	timeout time.Duration,
-	h func(interface{}) error) error {
+	h ResponseHandler) error {
 
 	s.pendingReq.Add(1)
 	respRequired := h != nil
@@ -689,21 +713,21 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	case <-s.disconnected:
 		s.popHandler(reqID)
 		return io.EOF
-	case resp := <-ch:
-		if resp.Err != nil {
-			if resp.V != nil {
-				_ = h(resp.V) // ignore result because resp.Err takes precedence
+	case msg := <-ch:
+		if msg.Err != nil {
+			if msg.Response() != nil {
+				_ = h(msg.Response()) // ignore result because msg.Err takes precedence
 			}
-			return resp.Err
+			return msg.Err
 		}
-		return h(resp.V)
+		return h(msg.Response())
 	case <-timer.C:
 		s.popHandler(reqID)
 		return ua.StatusBadTimeout
 	}
 }
 
-func (s *SecureChannel) popHandler(reqID uint32) (chan *response, bool) {
+func (s *SecureChannel) popHandler(reqID uint32) (chan *MessageBody, bool) {
 	s.handlersMu.Lock()
 	defer s.handlersMu.Unlock()
 
@@ -726,25 +750,25 @@ func (s *SecureChannel) Renew(ctx context.Context) error {
 // SendRequest sends the service request and calls h with the response.
 // Deprecated: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
-func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h ResponseHandler) error {
 	return s.SendRequestWithContext(context.Background(), req, authToken, h)
 }
 
 // Note: This method will be replaced by the non "WithContext()" version
 // of this method.
-func (s *SecureChannel) SendRequestWithContext(ctx context.Context, req ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequestWithContext(ctx context.Context, req ua.Request, authToken *ua.NodeID, h ResponseHandler) error {
 	return s.SendRequestWithTimeoutWithContext(ctx, req, authToken, s.cfg.RequestTimeout, h)
 }
 
 // Deprecated: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
-func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h ResponseHandler) error {
 	return s.SendRequestWithTimeoutWithContext(context.Background(), req, authToken, timeout, h)
 }
 
 // Note: This method will be replaced by the non "WithContext()" version
 // of this method.
-func (s *SecureChannel) SendRequestWithTimeoutWithContext(ctx context.Context, req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequestWithTimeoutWithContext(ctx context.Context, req ua.Request, authToken *ua.NodeID, timeout time.Duration, h ResponseHandler) error {
 	s.reqLocker.waitIfLock()
 	active, err := s.getActiveChannelInstance()
 	if err != nil {
@@ -762,7 +786,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	authToken *ua.NodeID,
 	respRequired bool,
 	timeout time.Duration,
-) (<-chan *response, error) {
+) (<-chan *MessageBody, error) {
 
 	instance.Lock()
 	defer instance.Unlock()
@@ -772,11 +796,11 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		return nil, err
 	}
 
-	var resp chan *response
+	var resp chan *MessageBody
 
 	if respRequired {
 		// register the handler if a callback was passed
-		resp = make(chan *response, 1)
+		resp = make(chan *MessageBody, 1)
 
 		s.handlersMu.Lock()
 
