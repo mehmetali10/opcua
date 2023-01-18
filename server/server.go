@@ -249,7 +249,7 @@ func (s *Server) monitorConnections(ctx context.Context) {
 				debug.Printf("monitorConnections: Server received response %T ???", resp)
 				continue // todo(fs): close SC???
 			}
-			debug.Printf("monitorConnections: Received Message: %T\n", msg.Response())
+			debug.Printf("monitorConnections: Received Message: %T\n", msg.Request())
 			s.cb.mu.RLock()
 			sc, ok := s.cb.s[msg.SecureChannelID]
 			s.cb.mu.RUnlock()

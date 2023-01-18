@@ -6,6 +6,7 @@ package uasc
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
@@ -169,7 +170,17 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 }
 
 func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
-	return newSecureChannel(endpoint, c, cfg, errCh, secureChannelID, sequenceNumber, securityTokenID)
+	s, err := newSecureChannel(endpoint, c, cfg, errCh, secureChannelID, sequenceNumber, securityTokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.openingInstance = newChannelInstance(s)
+	s.openingInstance.secureChannelID = secureChannelID
+	s.openingInstance.sequenceNumber = sequenceNumber
+	s.openingInstance.securityTokenID = securityTokenID
+
+	return s, nil
 }
 
 func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
@@ -380,6 +391,16 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 
 			msg.body = body
 
+			// todo(fs): not sure this is correct
+			if req, ok := msg.Request().(*ua.OpenSecureChannelRequest); ok {
+				err := s.handleOpenSecureChannelRequest(req)
+				if err != nil {
+					debug.Printf("uasc %d/%d: handling %T failed: %v", s.c.ID(), reqID, req, err)
+					return &MessageBody{Err: err}
+				}
+				return &MessageBody{}
+			}
+
 			// If the service status is not OK then bubble
 			// that error up to the caller.
 			if resp := msg.Response(); resp != nil {
@@ -497,7 +518,7 @@ func (s *SecureChannel) getInstancesBySecureChannelID(id uint32) []*channelInsta
 	defer s.instancesMu.Unlock()
 
 	instances := s.instances[id]
-	if instances == nil {
+	if len(instances) == 0 {
 		return nil
 	}
 
@@ -601,6 +622,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	}
 
 	return s.sendRequestWithTimeout(ctx, req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v ua.Response) error {
+		debug.Printf("OpenSecureChannelResponse handler")
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", v)
@@ -644,6 +666,114 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 	go s.scheduleExpiration(instance)
 
 	return
+}
+
+func (s *SecureChannel) handleOpenSecureChannelRequest(svc ua.Request) error {
+	debug.Printf("handleOpenSecureChannelRequest: Got OPN Request\n")
+
+	var err error
+
+	req, ok := svc.(*ua.OpenSecureChannelRequest)
+	if !ok {
+		debug.Printf("Expected OpenSecureChannel Request, got %T\n", svc)
+	}
+
+	// Part 6.7.4: https://reference.opcfoundation.org/Core/Part6/v105/docs/6.7.4
+	// todo(fs): check that ClientProtocolVersion matches HELLO.Version
+	// todo(fs): respond with Bad_ProtocolVersionUnsupported if they don't match
+	// todo(fs): also make sure that ServerProtocolVersion in the response is the
+	// todo(fs): the same as ACK.Version. Return the error if we don't support
+	// todo(fs): the client protocol version.
+	// todo(fs): how do we get the HELLO.Version here?
+	// if hello.Version != req.ClientProtocolVersion || req.ClientProtocolVersion != 0 {
+	if req.ClientProtocolVersion != 0 {
+		return ua.StatusBadProtocolVersionUnsupported
+	}
+
+	// Part 6.7.4: The AuthenticationToken should be nil. ???
+	// if req.RequestHeader.AuthenticationToken != nil {
+	// 	return ua.StatusBadSecureChannelTokenUnknown
+	// }
+
+	s.cfg.Lifetime = req.RequestedLifetime
+	s.cfg.SecurityMode = req.SecurityMode
+
+	var (
+		localKey  *rsa.PrivateKey
+		remoteKey *rsa.PublicKey
+	)
+
+	// Set the encryption methods to Asymmetric with the appropriate
+	// public keys.  OpenSecureChannel is always encrypted with the
+	// asymmetric algorithms.
+	// The default value of the encryption algorithm method is the
+	// SecurityModeNone so no additional work is required for that case
+	if s.cfg.SecurityMode != ua.MessageSecurityModeNone {
+		localKey = s.cfg.LocalKey
+		// todo(dh): move this into the uapolicy package proper or
+		// adjust the Asymmetric method to receive a certificate instead
+		remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
+		if err != nil {
+			return err
+		}
+		var ok bool
+		if remoteKey, ok = remoteCert.PublicKey.(*rsa.PublicKey); !ok {
+			return ua.StatusBadCertificateInvalid
+		}
+	}
+
+	algo, err := uapolicy.Asymmetric(s.cfg.SecurityPolicyURI, localKey, remoteKey)
+	if err != nil {
+		return err
+	}
+
+	instance := s.openingInstance
+	instance.algo = algo
+	instance.sc.requestID = req.RequestHeader.RequestHandle // todo(fs): is this correct?
+
+	nonce := make([]byte, instance.algo.NonceLength())
+	if _, err := rand.Read(nonce); err != nil {
+		return err
+	}
+	resp := &ua.OpenSecureChannelResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          s.timeNow(),
+			RequestHandle:      req.RequestHeader.RequestHandle,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		ServerProtocolVersion: 0,
+		SecurityToken: &ua.ChannelSecurityToken{
+			ChannelID:       instance.secureChannelID,
+			TokenID:         instance.securityTokenID,
+			CreatedAt:       s.timeNow(),
+			RevisedLifetime: req.RequestedLifetime,
+		},
+		ServerNonce: nonce,
+	}
+
+	ctx := context.Background() // todo(fs): fixme
+	if err := s.sendResponseWithContext(ctx, instance, resp); err != nil {
+		return err
+	}
+
+	instance.algo, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, nonce, req.ClientNonce)
+	if err != nil {
+		return err
+	}
+	instance.state = channelActive // todo(fs): is this correct?
+	// s.setState(secureChannelOpen)
+
+	s.instancesMu.Lock()
+	s.instances[instance.secureChannelID] = append(
+		s.instances[instance.secureChannelID],
+		instance,
+	)
+	s.activeInstance = instance
+	s.instancesMu.Unlock()
+
+	return nil
 }
 
 func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
@@ -888,18 +1018,25 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 }
 
 func (s *SecureChannel) SendResponseWithContext(ctx context.Context, resp ua.Response) error {
+	return s.sendResponseWithContext(ctx, nil, resp)
+}
+
+func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *channelInstance, resp ua.Response) error {
 	typeID := ua.ServiceTypeID(resp)
 	if typeID == 0 {
 		return errors.Errorf("uasc: unknown service %T. Did you call register?", resp)
 	}
 
-	instance, err := s.getActiveChannelInstance()
-	if err != nil {
-		return err
+	var err error
+	if instance == nil {
+		instance, err = s.getActiveChannelInstance()
+		if err != nil {
+			return err
+		}
 	}
 
 	// encode the message
-	m := instance.newMessage(resp, typeID, instance.sc.requestID)
+	m := instance.newMessage(resp, typeID, resp.Header().RequestHandle)
 	reqid := m.SequenceHeader.RequestID
 	b, err := m.Encode()
 	if err != nil {
