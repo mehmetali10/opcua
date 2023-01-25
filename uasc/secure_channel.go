@@ -28,6 +28,13 @@ const (
 	MaxTimeout      = math.MaxUint32 * time.Millisecond
 )
 
+type channelKind int
+
+const (
+	client channelKind = iota
+	server
+)
+
 // ResponseHandler handles the response of a service request and
 // is used by the client.
 type ResponseHandler func(ua.Response) error
@@ -142,35 +149,38 @@ type SecureChannel struct {
 
 	// required for the server channel
 
-	// secureChannelID is a unique identifier for the SecureChannel assigned by the Server.
-	// If a Server receives a SecureChannelId which it does not recognize it shall return an
-	// appropriate transport layer error.
-	//
-	// When a Server starts the first SecureChannelId used should be a value that is likely to
-	// be unique after each restart. This ensures that a Server restart does not cause
-	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
-	// to them.
-	secureChannelID uint32
+	// // secureChannelID is a unique identifier for the SecureChannel assigned by the Server.
+	// // If a Server receives a SecureChannelId which it does not recognize it shall return an
+	// // appropriate transport layer error.
+	// //
+	// // When a Server starts the first SecureChannelId used should be a value that is likely to
+	// // be unique after each restart. This ensures that a Server restart does not cause
+	// // previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
+	// // to them.
+	// secureChannelID uint32
 
-	// sequenceNumber is a monotonically increasing sequence number assigned by the sender to each
-	// MessageChunk sent over the SecureChannel.
-	sequenceNumber uint32
+	// // sequenceNumber is a monotonically increasing sequence number assigned by the sender to each
+	// // MessageChunk sent over the SecureChannel.
+	// sequenceNumber uint32
 
-	// securityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
-	// This identifier is returned by the Server in an OpenSecureChannel response Message.
-	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
-	// transport layer error.
-	securityTokenID uint32
+	// // securityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
+	// // This identifier is returned by the Server in an OpenSecureChannel response Message.
+	// // If a Server receives a TokenId which it does not recognize it shall return an appropriate
+	// // transport layer error.
+	// securityTokenID uint32
+
+	// kind indicates whether this is a server or a client channel.
+	kind channelKind
 
 	closeOnce sync.Once
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
-	return newSecureChannel(endpoint, c, cfg, errCh, 0, 0, 0)
+	return newSecureChannel(endpoint, c, cfg, client, errCh, 0, 0, 0)
 }
 
 func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
-	s, err := newSecureChannel(endpoint, c, cfg, errCh, secureChannelID, sequenceNumber, securityTokenID)
+	s, err := newSecureChannel(endpoint, c, cfg, server, errCh, secureChannelID, sequenceNumber, securityTokenID)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +193,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 	return s, nil
 }
 
-func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
+func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
@@ -208,21 +218,22 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 	}
 
 	s := &SecureChannel{
-		endpointURL:     endpoint,
-		c:               c,
-		cfg:             cfg,
-		requestID:       cfg.RequestIDSeed,
-		secureChannelID: secureChannelID,
-		sequenceNumber:  sequenceNumber,
-		securityTokenID: securityTokenID,
-		reqLocker:       newConditionLocker(),
-		rcvLocker:       newConditionLocker(),
-		errCh:           errCh,
-		closing:         make(chan struct{}),
-		disconnected:    make(chan struct{}),
-		instances:       make(map[uint32][]*channelInstance),
-		chunks:          make(map[uint32][]*MessageChunk),
-		handlers:        make(map[uint32]chan *MessageBody),
+		endpointURL: endpoint,
+		c:           c,
+		cfg:         cfg,
+		requestID:   cfg.RequestIDSeed,
+		kind:        kind,
+		// secureChannelID: secureChannelID,
+		// sequenceNumber:  sequenceNumber,
+		// securityTokenID: securityTokenID,
+		reqLocker:    newConditionLocker(),
+		rcvLocker:    newConditionLocker(),
+		errCh:        errCh,
+		closing:      make(chan struct{}),
+		disconnected: make(chan struct{}),
+		instances:    make(map[uint32][]*channelInstance),
+		chunks:       make(map[uint32][]*MessageChunk),
+		handlers:     make(map[uint32]chan *MessageBody),
 	}
 
 	return s, nil
@@ -583,9 +594,9 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	}
 
 	s.openingInstance = newChannelInstance(s)
-	s.openingInstance.secureChannelID = s.secureChannelID
-	s.openingInstance.sequenceNumber = s.sequenceNumber
-	s.openingInstance.securityTokenID = s.securityTokenID
+	// s.openingInstance.secureChannelID = s.secureChannelID
+	// s.openingInstance.sequenceNumber = s.sequenceNumber
+	// s.openingInstance.securityTokenID = s.securityTokenID
 
 	if requestType == ua.SecurityTokenRequestTypeRenew {
 		// TODO: lock? sequenceNumber++?
@@ -662,8 +673,19 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 
 	debug.Printf("uasc %d: received security token. channelID=%d tokenID=%d createdAt=%s lifetime=%s", s.c.ID(), instance.secureChannelID, instance.securityTokenID, instance.createdAt.Format(time.RFC3339), instance.revisedLifetime)
 
-	go s.scheduleRenewal(instance)
-	go s.scheduleExpiration(instance)
+	// depending on whether the channel is used in a client
+	// or a server we need to trigger different behavior.
+	// client channels trigger token renewals and need to cleanup old
+	// channel crypto configs. server channels only need to do the
+	// channel cleanup.
+	switch s.kind {
+	case client:
+		go s.scheduleRenewal(instance)
+		go s.scheduleExpiration(instance)
+
+	case server:
+		go s.scheduleExpiration(instance)
+	}
 
 	return
 }
