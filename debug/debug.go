@@ -57,7 +57,7 @@ func ToJSON(v interface{}) string {
 	return string(b)
 }
 
-// FlagSet returns true if the OPCUA_DEBUG environment variable contains the
+// FlagSet returns true if the OPC_DEBUG environment variable contains the
 // given flag.
 func FlagSet(name string) bool {
 	return slices.Contains(strings.Fields(Flags), name)
