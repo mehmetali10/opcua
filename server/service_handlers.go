@@ -81,7 +81,7 @@ func (s *Server) registerHandler(typeID uint16, f handlerFunc) {
 	s.serviceHandlers[typeID] = f
 }
 
-func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, req ua.Request) {
+func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqID uint32, req ua.Request) {
 	debug.Printf("handleService: Got: %T\n", req)
 
 	var resp ua.Response
@@ -98,7 +98,6 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, req 
 		err = ua.StatusBadServiceUnsupported
 	}
 
-	// todo(dh): Find the actual request ID for the response headers
 	if err != nil {
 		if statusCode, ok := err.(ua.StatusCode); ok {
 			resp = &ua.ServiceFault{ResponseHeader: responseHeader(0, statusCode)}
@@ -111,7 +110,7 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, req 
 		return
 	}
 
-	err = sc.SendResponseWithContext(ctx, resp)
+	err = sc.SendResponseWithContext(ctx, reqID, resp)
 	if err != nil {
 		debug.Printf("Error sending response: %s\n", err)
 	}

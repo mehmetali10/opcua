@@ -264,7 +264,7 @@ func (s *Server) monitorConnections(ctx context.Context) {
 			}
 
 			// todo: should this be delegated to another goroutine in case handling this hangs?
-			s.handleService(ctx, sc, msg.Request())
+			s.handleService(ctx, sc, msg.RequestID, msg.Request())
 		}
 	}
 }

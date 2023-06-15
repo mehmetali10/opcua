@@ -404,7 +404,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 
 			// todo(fs): not sure this is correct
 			if req, ok := msg.Request().(*ua.OpenSecureChannelRequest); ok {
-				err := s.handleOpenSecureChannelRequest(req)
+				err := s.handleOpenSecureChannelRequest(reqID, req)
 				if err != nil {
 					debug.Printf("uasc %d/%d: handling %T failed: %v", s.c.ID(), reqID, req, err)
 					return &MessageBody{Err: err}
@@ -690,7 +690,7 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 	return
 }
 
-func (s *SecureChannel) handleOpenSecureChannelRequest(svc ua.Request) error {
+func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Request) error {
 	debug.Printf("handleOpenSecureChannelRequest: Got OPN Request\n")
 
 	var err error
@@ -776,7 +776,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc ua.Request) error {
 	}
 
 	ctx := context.Background() // todo(fs): fixme
-	if err := s.sendResponseWithContext(ctx, instance, resp); err != nil {
+	if err := s.sendResponseWithContext(ctx, instance, reqID, resp); err != nil {
 		return err
 	}
 
@@ -1039,11 +1039,11 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	return resp, nil
 }
 
-func (s *SecureChannel) SendResponseWithContext(ctx context.Context, resp ua.Response) error {
-	return s.sendResponseWithContext(ctx, nil, resp)
+func (s *SecureChannel) SendResponseWithContext(ctx context.Context, reqID uint32, resp ua.Response) error {
+	return s.sendResponseWithContext(ctx, nil, reqID, resp)
 }
 
-func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *channelInstance, resp ua.Response) error {
+func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *channelInstance, reqID uint32, resp ua.Response) error {
 	typeID := ua.ServiceTypeID(resp)
 	if typeID == 0 {
 		return errors.Errorf("uasc: unknown service %T. Did you call register?", resp)
@@ -1058,8 +1058,7 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	}
 
 	// encode the message
-	m := instance.newMessage(resp, typeID, resp.Header().RequestHandle)
-	reqid := m.SequenceHeader.RequestID
+	m := instance.newMessage(resp, typeID, reqID)
 	b, err := m.Encode()
 	if err != nil {
 		return err
@@ -1086,7 +1085,7 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	atomic.AddUint64(&instance.bytesSent, uint64(n))
 	atomic.AddUint32(&instance.messagesSent, 1)
 
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqid, resp, len(b))
+	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
 
 	return nil
 }
