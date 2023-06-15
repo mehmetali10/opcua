@@ -145,7 +145,7 @@ type SecureChannel struct {
 	openingMu       sync.Mutex
 
 	// errorCh receive dispatcher errors
-	errCh chan<- error
+	errch chan<- error
 
 	// required for the server channel
 
@@ -193,7 +193,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 	return s, nil
 }
 
-func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
+func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errch chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
@@ -228,7 +228,7 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKi
 		// securityTokenID: securityTokenID,
 		reqLocker:    newConditionLocker(),
 		rcvLocker:    newConditionLocker(),
-		errCh:        errCh,
+		errch:        errch,
 		closing:      make(chan struct{}),
 		disconnected: make(chan struct{}),
 		instances:    make(map[uint32][]*channelInstance),
@@ -268,7 +268,7 @@ func (s *SecureChannel) dispatcher() {
 					return
 				default:
 					select {
-					case s.errCh <- msg.Err:
+					case s.errch <- msg.Err:
 					default:
 					}
 				}
