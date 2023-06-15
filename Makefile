@@ -24,7 +24,6 @@ install-py-opcua:
 gen:
 	go install golang.org/x/tools/cmd/stringer@latest
 	go generate ./...
-	go mod tidy
 
 release:
 	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --clean

@@ -7,6 +7,7 @@ package ua
 import (
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"math"
 
@@ -379,5 +380,19 @@ func (n *NodeID) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*n = *nid
+	return nil
+}
+
+// todo(fs): not sure if this should exist here. Maybe there are multiple different xml formats?
+func (n *NodeID) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var s string
+	if err := d.DecodeElement(&s, &start); err != nil {
+		return err
+	}
+	id, err := ParseNodeID(s)
+	if err != nil {
+		return err
+	}
+	*n = *id
 	return nil
 }
