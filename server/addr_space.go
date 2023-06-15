@@ -5,7 +5,6 @@
 package server
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -14,7 +13,38 @@ import (
 
 type Node interface {
 	ID() *ua.NodeID
+	Value() *ua.Variant
 	Attribute(ua.AttributeID) (*AttrValue, error)
+}
+
+type node struct {
+	id    *ua.NodeID
+	value func() *ua.Variant
+	attr  map[ua.AttributeID]*ua.Variant
+
+	superTypeID *ua.NodeID
+}
+
+func NewNode(id *ua.NodeID, v func() *ua.Variant, attr map[ua.AttributeID]*ua.Variant) *node {
+	return &node{id, v, attr, ua.NewTwoByteNodeID(0)}
+}
+
+func (n *node) ID() *ua.NodeID {
+	return n.id
+}
+
+func (n *node) Value() *ua.Variant {
+	return n.value()
+}
+
+func (n *node) Attribute(id ua.AttributeID) (*AttrValue, error) {
+	if n.attr == nil {
+		return nil, ua.StatusBadAttributeIDInvalid
+	}
+	if v := n.attr[id]; v != nil {
+		return NewAttrValue(v), nil
+	}
+	return nil, ua.StatusBadAttributeIDInvalid
 }
 
 type AttrValue struct {
@@ -22,16 +52,13 @@ type AttrValue struct {
 	SourceTimestamp time.Time
 }
 
-func (v *AttrValue) String() string {
-	return fmt.Sprintf("v=%#v ts=%s", v.Value.Value(), v.SourceTimestamp)
-}
-
 func NewAttrValue(v *ua.Variant) *AttrValue {
 	return &AttrValue{Value: v}
 }
 
 type AddressSpace interface {
-	Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error)
+	Attribute(*ua.NodeID, ua.AttributeID) (*AttrValue, error)
+	Node(*ua.NodeID) (Node, error)
 }
 
 // MergeAS merges multiple address spaces in ascending order.
@@ -44,12 +71,20 @@ func NewMergeAS(as ...AddressSpace) *MergeAS {
 }
 
 func (s *MergeAS) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
+	n, err := s.Node(id)
+	if err != nil {
+		return nil, err
+	}
+	return n.Attribute(attr)
+}
+
+func (s *MergeAS) Node(id *ua.NodeID) (Node, error) {
 	for _, as := range s.as {
-		v, err := as.Attribute(id, attr)
+		n, err := as.Node(id)
 		if err == ua.StatusBadNodeIDUnknown {
 			continue
 		}
-		return v, err
+		return n, err
 	}
 	return nil, ua.StatusBadNodeIDUnknown
 }
@@ -82,3 +117,18 @@ func (a *SyncAS) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, erro
 	}
 	return n.Attribute(attr)
 }
+
+func (a *SyncAS) Node(id *ua.NodeID) (Node, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	n := a.nodes[id.String()]
+	if n == nil {
+		return nil, ua.StatusBadNodeIDUnknown
+	}
+	return n, nil
+}
+
+// interface compliance
+var _ Node = (*node)(nil)
+var _ AddressSpace = (*MergeAS)(nil)
+var _ AddressSpace = (*SyncAS)(nil)

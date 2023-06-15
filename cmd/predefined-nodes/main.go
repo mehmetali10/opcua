@@ -111,32 +111,7 @@ var tmpl = template.Must(template.New("").Parse(`// Generated code. DO NOT EDIT
  // found in the LICENSE file.
  package {{.Package}}
 
- import (
-	"github.com/gopcua/opcua/server/as"
-	"github.com/gopcua/opcua/ua"
- )
-
-
- type node struct {
- 	id   *ua.NodeID
- 	attr map[ua.AttributeID]*as.AttrValue
- 	superTypeID *ua.NodeID
- }
-
- func (n *node) ID() *ua.NodeID {
- 	return n.id
- }
-
- func (n *node) Attribute(id ua.AttributeID) (*as.AttrValue, error) {
- 	if n.attr == nil {
- 		return nil, ua.StatusBadAttributeIDInvalid
- 	}
- 	v := n.attr[id]
- 	if v == nil {
- 		return nil, ua.StatusBadAttributeIDInvalid
- 	}
- 	return v, nil
- }
+ import "github.com/gopcua/opcua/ua"
 
  func PredefinedNodes() []Node{
  	return []Node{
@@ -146,12 +121,12 @@ var tmpl = template.Must(template.New("").Parse(`// Generated code. DO NOT EDIT
  			{{- with .NodeID.Identifier }}
  			id: ua.NewNumericNodeID({{.Namespace}}, {{.IntID}}),
  			{{- end}}
- 			attr: map[ua.AttributeID]*AttrValue{
- 				ua.AttributeIDNodeClass: NewAttrValue(ua.MustVariant("{{.NodeClass}}")),
- 				ua.AttributeIDBrowseName: NewAttrValue(ua.MustVariant("{{.BrowseName.Name}}")),
- 				ua.AttributeIDDisplayName: NewAttrValue(ua.MustVariant("{{.BrowseName.Name}}")),
+ 			attr: map[ua.AttributeID]*ua.Variant{
+ 				ua.AttributeIDNodeClass: ua.MustVariant("{{.NodeClass}}"),
+ 				ua.AttributeIDBrowseName: ua.MustVariant("{{.BrowseName.Name}}"),
+ 				ua.AttributeIDDisplayName: ua.MustVariant("{{.BrowseName.Name}}"),
  				{{- with .InverseName }}
- 				ua.AttributeIDInverseName: NewAttrValue(ua.MustVariant(&ua.LocalizedText{Locale:"{{.Locale}}", Text:"{{.Text}}"})),
+ 				ua.AttributeIDInverseName: ua.MustVariant(&ua.LocalizedText{Locale:"{{.Locale}}", Text:"{{.Text}}"}),
  				{{- end}}
  			},
  			{{- with .SuperTypeID.Identifier }}

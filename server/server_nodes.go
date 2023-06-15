@@ -3,60 +3,47 @@ package server
 import (
 	"time"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
 
-type ValueNode struct {
-	NodeID     *ua.NodeID
-	BrowseName string
-	Value      func() interface{}
-}
-
-func (n *ValueNode) ID() *ua.NodeID {
-	return n.NodeID
-}
-
-func (n *ValueNode) Attribute(attr ua.AttributeID) (*AttrValue, error) {
-	switch attr {
-	case ua.AttributeIDBrowseName:
-		return NewAttrValue(ua.MustVariant(n.BrowseName)), nil
-	case ua.AttributeIDValue:
-		v, err := ua.NewVariant(n.Value())
-		if err != nil {
-			return NewAttrValue(ua.MustVariant(nil)), nil
-		}
-		return NewAttrValue(v), nil
-	default:
-		return nil, ua.StatusBadAttributeIDInvalid
-	}
-}
-
-func CurrentTimeNode() *ValueNode {
-	return &ValueNode{
-		NodeID:     ua.NewNumericNodeID(0, 2258),
-		BrowseName: "CurrentTime",
-		Value: func() interface{} {
-			return time.Now()
+func CurrentTimeNode() *node {
+	return &node{
+		id:    ua.NewNumericNodeID(0, 2258),
+		value: func() *ua.Variant { return ua.MustVariant(time.Now()) },
+		attr: map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "CurrentTime"}),
 		},
 	}
 }
 
-func NamespacesNode(s *Server) *ValueNode {
-	return &ValueNode{
-		NodeID:     ua.NewNumericNodeID(0, 2255),
-		BrowseName: "Namespaces",
-		Value: func() interface{} {
-			return s.Namespaces()
+func NamespacesNode(s *Server) *node {
+	return &node{
+		id:    ua.NewNumericNodeID(0, 2255),
+		value: func() *ua.Variant { return ua.MustVariant(s.Namespaces()) },
+		attr: map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "Namespaces"}),
 		},
 	}
 }
 
-func ServerStatusNode(s *Server) *ValueNode {
-	return &ValueNode{
-		NodeID:     ua.NewNumericNodeID(0, 2256),
-		BrowseName: "ServerStatus",
-		Value: func() interface{} {
-			return ua.NewExtensionObject(s.Status())
+func ServerStatusNode(s *Server) *node {
+	return &node{
+		id:    ua.NewNumericNodeID(0, 2256),
+		value: func() *ua.Variant { return ua.MustVariant(ua.NewExtensionObject(s.Status())) },
+		attr: map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "ServerStatus"}),
+		},
+	}
+}
+
+func RootNode(s *Server) *node {
+	return &node{
+		id: ua.NewNumericNodeID(0, id.RootFolder),
+		attr: map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDNodeClass:  ua.MustVariant(ua.NodeClassObject),
+			ua.AttributeIDDataType:   ua.MustVariant(ua.NewNumericExpandedNodeID(0, id.DataTypesFolder)),
+			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "Root"}),
 		},
 	}
 }

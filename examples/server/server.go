@@ -55,13 +55,13 @@ func main() {
 
 	// create a user address space
 	uas := server.NewSyncAS()
-	uas.AddNodes(&server.ValueNode{
-		NodeID:     ua.NewNumericNodeID(0, 9999),
-		BrowseName: "MyValueNode",
-		Value: func() interface{} {
-			return "MyValue"
+	uas.AddNodes(server.NewNode(
+		ua.NewNumericNodeID(0, 9999),
+		func() *ua.Variant { return ua.MustVariant("MyValue") },
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "MyValueNode"}),
 		},
-	})
+	))
 
 	opts = append(opts, server.UserAddressSpace(uas))
 
