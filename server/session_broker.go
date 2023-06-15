@@ -25,11 +25,10 @@ type sessionConfig struct {
 }
 
 type sessionBroker struct {
-	// wg sync.WaitGroup
-
 	// mu protects concurrent modification of s
 	mu sync.Mutex
-	// s is a slice of all sessions watched by the session broker
+
+	// s contains all sessions watched by the session broker
 	s map[string]*session
 }
 
@@ -53,21 +52,23 @@ func (sb *sessionBroker) NewSession() *session {
 }
 
 func (sb *sessionBroker) Close(authToken *ua.NodeID) error {
-	s, ok := sb.s[authToken.String()]
-	if !ok {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+
+	if sb.s[authToken.String()] == nil {
 		debug.Printf("sessionBroker.Close: error looking up session %v", authToken)
 	}
-
-	sb.mu.Lock()
-	delete(sb.s, s.AuthTokenID.String())
-	sb.mu.Unlock()
+	delete(sb.s, authToken.String())
 
 	return nil
 }
 
 func (sb *sessionBroker) Session(authToken *ua.NodeID) *session {
-	s, ok := sb.s[authToken.String()]
-	if !ok {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+
+	s := sb.s[authToken.String()]
+	if s == nil {
 		debug.Printf("sessionBroker.Session: error looking up session %v", authToken)
 	}
 
