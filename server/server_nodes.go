@@ -6,58 +6,57 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-type currentTime struct{}
-
-func (n *currentTime) ID() *ua.NodeID {
-	return ua.NewNumericNodeID(0, 2258)
+type ValueNode struct {
+	NodeID     *ua.NodeID
+	BrowseName string
+	Value      func() interface{}
 }
 
-func (n *currentTime) Attribute(attr ua.AttributeID) (*AttrValue, error) {
+func (n *ValueNode) ID() *ua.NodeID {
+	return n.NodeID
+}
+
+func (n *ValueNode) Attribute(attr ua.AttributeID) (*AttrValue, error) {
 	switch attr {
 	case ua.AttributeIDBrowseName:
-		return NewAttrValue(ua.MustVariant("CurrentTime")), nil
+		return NewAttrValue(ua.MustVariant(n.BrowseName)), nil
 	case ua.AttributeIDValue:
-		return NewAttrValue(ua.MustVariant(time.Now())), nil
+		v, err := ua.NewVariant(n.Value())
+		if err != nil {
+			return NewAttrValue(ua.MustVariant(nil)), nil
+		}
+		return NewAttrValue(v), nil
 	default:
 		return nil, ua.StatusBadAttributeIDInvalid
 	}
 }
 
-type namespaces struct {
-	s *Server
-}
-
-func (n *namespaces) ID() *ua.NodeID {
-	return ua.NewNumericNodeID(0, 2255)
-}
-
-func (n *namespaces) Attribute(attr ua.AttributeID) (*AttrValue, error) {
-	switch attr {
-	case ua.AttributeIDBrowseName:
-		return NewAttrValue(ua.MustVariant("Namespaces")), nil
-	case ua.AttributeIDValue:
-		return NewAttrValue(ua.MustVariant(n.s.Namespaces())), nil
-	default:
-		return nil, ua.StatusBadAttributeIDInvalid
+func CurrentTimeNode() *ValueNode {
+	return &ValueNode{
+		NodeID:     ua.NewNumericNodeID(0, 2258),
+		BrowseName: "CurrentTime",
+		Value: func() interface{} {
+			return time.Now()
+		},
 	}
-
 }
 
-type serverStatus struct {
-	s *Server
+func NamespacesNode(s *Server) *ValueNode {
+	return &ValueNode{
+		NodeID:     ua.NewNumericNodeID(0, 2255),
+		BrowseName: "Namespaces",
+		Value: func() interface{} {
+			return s.Namespaces()
+		},
+	}
 }
 
-func (n *serverStatus) ID() *ua.NodeID {
-	return ua.NewNumericNodeID(0, 2256)
-}
-
-func (n *serverStatus) Attribute(attr ua.AttributeID) (*AttrValue, error) {
-	switch attr {
-	case ua.AttributeIDBrowseName:
-		return NewAttrValue(ua.MustVariant("ServerStatus")), nil
-	case ua.AttributeIDValue:
-		return NewAttrValue(ua.MustVariant(ua.NewExtensionObject(n.s.Status()))), nil
-	default:
-		return nil, ua.StatusBadAttributeIDInvalid
+func ServerStatusNode(s *Server) *ValueNode {
+	return &ValueNode{
+		NodeID:     ua.NewNumericNodeID(0, 2256),
+		BrowseName: "ServerStatus",
+		Value: func() interface{} {
+			return ua.NewExtensionObject(s.Status())
+		},
 	}
 }

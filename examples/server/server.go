@@ -53,6 +53,18 @@ func main() {
 		//		server.EnableAuthWithoutEncryption(), // Dangerous and not recommended, shown for illustration only
 	)
 
+	// create a user address space
+	uas := server.NewSyncAS()
+	uas.AddNodes(&server.ValueNode{
+		NodeID:     ua.NewNumericNodeID(0, 9999),
+		BrowseName: "MyValueNode",
+		Value: func() interface{} {
+			return "MyValue"
+		},
+	})
+
+	opts = append(opts, server.UserAddressSpace(uas))
+
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
 		debug.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)

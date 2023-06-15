@@ -2,11 +2,10 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-//go:generate go run ../cmd/predefined-nodes/main.go
-
 package server
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -23,38 +22,60 @@ type AttrValue struct {
 	SourceTimestamp time.Time
 }
 
+func (v *AttrValue) String() string {
+	return fmt.Sprintf("v=%#v ts=%s", v.Value.Value(), v.SourceTimestamp)
+}
+
 func NewAttrValue(v *ua.Variant) *AttrValue {
 	return &AttrValue{Value: v}
 }
 
-type AddressSpace struct {
-	mu    sync.RWMutex
+type AddressSpace interface {
+	Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error)
+}
+
+// MergeAS merges multiple address spaces in ascending order.
+type MergeAS struct {
+	as []AddressSpace
+}
+
+func NewMergeAS(as ...AddressSpace) *MergeAS {
+	return &MergeAS{as}
+}
+
+func (s *MergeAS) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
+	for _, as := range s.as {
+		v, err := as.Attribute(id, attr)
+		if err == ua.StatusBadNodeIDUnknown {
+			continue
+		}
+		return v, err
+	}
+	return nil, ua.StatusBadNodeIDUnknown
+}
+
+// SyncAS implements a mutable address space which is safe for concurrent access.
+type SyncAS struct {
+	mu    sync.Mutex
 	nodes map[string]Node
 }
 
-func newAddressSpace(nodes ...Node) *AddressSpace {
-	return &AddressSpace{nodes: make(map[string]Node)}
+func NewSyncAS() *SyncAS {
+	return &SyncAS{nodes: make(map[string]Node)}
 }
 
-func (a *AddressSpace) AddNodes(nodes ...Node) error {
+func (a *SyncAS) AddNodes(nodes ...Node) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	for _, n := range nodes {
-		if err := a.AddNode(n); err != nil {
-			return err
-		}
+		a.nodes[n.ID().String()] = n
 	}
 	return nil
 }
 
-func (a *AddressSpace) AddNode(n Node) error {
+func (a *SyncAS) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
 	a.mu.Lock()
-	a.nodes[n.ID().String()] = n
-	a.mu.Unlock()
-	return nil
-}
-
-func (a *AddressSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	defer a.mu.Unlock()
 	n := a.nodes[id.String()]
 	if n == nil {
 		return nil, ua.StatusBadNodeIDUnknown

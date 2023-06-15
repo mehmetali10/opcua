@@ -14,11 +14,15 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
 )
+
+//go:generate go run ../cmd/predefined-nodes/main.go
 
 const defaultListenAddr = "opc.tcp://localhost:0"
 
@@ -28,15 +32,15 @@ type Server struct {
 
 	cfg *serverConfig
 
-	mu         sync.RWMutex
+	mu         sync.Mutex
 	status     *ua.ServerStatusDataType
-	Endpoints  []*ua.EndpointDescription
+	endpoints  []*ua.EndpointDescription
 	namespaces []string
 
 	l  *uacp.Listener
 	cb *channelBroker
 	sb *sessionBroker
-	as *AddressSpace
+	as AddressSpace
 
 	// nextSecureChannelID uint32
 
@@ -46,6 +50,7 @@ type Server struct {
 }
 
 type serverConfig struct {
+	uas            AddressSpace
 	privateKey     *rsa.PrivateKey
 	certificate    []byte
 	applicationURI string
@@ -75,7 +80,6 @@ func New(url string, opts ...Option) *Server {
 		cfg: cfg,
 		cb:  newChannelBroker(),
 		sb:  newSessionBroker(),
-		as:  newAddressSpace(),
 		namespaces: []string{
 			"http://opcfoundation.org/UA/", // ns:0
 		},
@@ -98,36 +102,27 @@ func New(url string, opts ...Option) *Server {
 }
 
 func (s *Server) Namespaces() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.namespaces
 }
 
 func (s *Server) AddNamespace(ns string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if idx := strSliceContains(s.namespaces, ns); idx >= 0 {
+	if idx := slices.Index(s.namespaces, ns); idx >= 0 {
 		return idx
 	}
 	s.namespaces = append(s.namespaces, ns)
 	return len(s.namespaces)
 }
 
-func strSliceContains(a []string, s string) int {
-	for i, v := range a {
-		if s == v {
-			return i
-		}
-	}
-	return -1
-}
-
 // Status returns the current server status.
 func (s *Server) Status() *ua.ServerStatusDataType {
 	status := new(ua.ServerStatusDataType)
-	s.mu.RLock()
+	s.mu.Lock()
 	*status = *s.status
-	s.mu.RUnlock()
+	s.mu.Unlock()
 	status.CurrentTime = time.Now()
 	return status
 }
@@ -146,14 +141,24 @@ func (s *Server) URL() string {
 func (s *Server) Start(ctx context.Context) error {
 	var err error
 
-	// init address space
+	// init server address space
 	nodes := PredefinedNodes()
-	nodes = append(nodes, &currentTime{})
-	nodes = append(nodes, &serverStatus{s})
-	nodes = append(nodes, &namespaces{s})
-	if err := s.as.AddNodes(nodes...); err != nil {
+	nodes = append(nodes, CurrentTimeNode())
+	nodes = append(nodes, NamespacesNode(s))
+	nodes = append(nodes, ServerStatusNode(s))
+	sas := NewSyncAS()
+	if err := sas.AddNodes(nodes...); err != nil {
 		return err
 	}
+
+	// init user address space
+	uas := s.cfg.uas
+	if uas == nil {
+		uas = NewSyncAS()
+	}
+
+	// merge server and user address space
+	s.as = NewMergeAS(sas, uas)
 
 	// Register all service handlers
 	s.initHandlers()
@@ -167,7 +172,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	log.Printf("Started listening on %s", s.URL())
 
-	s.generateEndpoints()
+	s.initEndpoints()
 	s.setServerState(ua.ServerStateRunning)
 
 	if s.cb == nil {
@@ -221,13 +226,13 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 						continue
 					}
 				default:
-					debug.Printf("error accepting connection: %s\n", err)
+					debug.Printf("error accepting connection: %s", err)
 					return
 				}
 			}
 
 			go s.cb.RegisterConn(ctx, c, s.cfg.certificate, s.cfg.privateKey)
-			debug.Printf("registered connection: %s\n", c.LocalAddr())
+			debug.Printf("registered connection: %s", c.LocalAddr())
 		}
 	}
 }
@@ -249,7 +254,7 @@ func (s *Server) monitorConnections(ctx context.Context) {
 				debug.Printf("monitorConnections: Server received response %T ???", resp)
 				continue // todo(fs): close SC???
 			}
-			debug.Printf("monitorConnections: Received Message: %T\n", msg.Request())
+			debug.Printf("monitorConnections: Received Message: %T", msg.Request())
 			s.cb.mu.RLock()
 			sc, ok := s.cb.s[msg.SecureChannelID]
 			s.cb.mu.RUnlock()
@@ -264,15 +269,9 @@ func (s *Server) monitorConnections(ctx context.Context) {
 	}
 }
 
-// generateEndpoints builds the endpoint list from the server's configuration
-func (s *Server) generateEndpoints() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.Endpoints == nil {
-		s.Endpoints = make([]*ua.EndpointDescription, 0)
-	}
-
+// initEndpoints builds the endpoint list from the server's configuration
+func (s *Server) initEndpoints() {
+	var endpoints []*ua.EndpointDescription
 	for _, sec := range s.cfg.enabledSec {
 		secLevel := uapolicy.SecurityLevel(sec.secPolicy, sec.secMode)
 
@@ -335,8 +334,10 @@ func (s *Server) generateEndpoints() error {
 				ep.UserIdentityTokens = append(ep.UserIdentityTokens, tok)
 			}
 		}
-		s.Endpoints = append(s.Endpoints, ep)
+		endpoints = append(endpoints, ep)
 	}
 
-	return nil
+	s.mu.Lock()
+	s.endpoints = endpoints
+	s.mu.Unlock()
 }

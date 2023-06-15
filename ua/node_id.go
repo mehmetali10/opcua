@@ -262,8 +262,13 @@ func (n *NodeID) SetStringID(v string) error {
 // String returns the string representation of the NodeID
 // in the format described by ParseNodeID.
 func (n *NodeID) String() string {
+	if n == nil {
+		return ""
+	}
+
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
+
 		return fmt.Sprintf("i=%d", n.nid)
 
 	case NodeIDTypeFourByte:
@@ -361,6 +366,10 @@ func (n *NodeID) Encode() ([]byte, error) {
 		return nil, errors.Errorf("invalid node id type %v", n.Type())
 	}
 	return buf.Bytes(), buf.Error()
+}
+
+func (n *NodeID) Equal(o *NodeID) bool {
+	return n.String() == o.String()
 }
 
 func (n *NodeID) MarshalJSON() ([]byte, error) {

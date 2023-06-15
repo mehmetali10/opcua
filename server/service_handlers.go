@@ -154,7 +154,7 @@ func handleFindServersRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (
 	response := &ua.FindServersResponse{
 		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
 		Servers: []*ua.ApplicationDescription{
-			s.Endpoints[0].Server,
+			s.endpoints[0].Server,
 		},
 	}
 
@@ -191,7 +191,7 @@ func handleGetEndpointsRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) 
 
 	response := &ua.GetEndpointsResponse{
 		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-		Endpoints:      s.Endpoints,
+		Endpoints:      s.endpoints,
 	}
 
 	return response, nil
@@ -316,7 +316,7 @@ func handleCreateSessionRequest(s *Server, sc *uasc.SecureChannel, r ua.Request)
 		},
 		ServerCertificate: s.cfg.certificate,
 		ServerNonce:       nonce,
-		ServerEndpoints:   s.Endpoints,
+		ServerEndpoints:   s.endpoints,
 	}
 
 	return response, nil
