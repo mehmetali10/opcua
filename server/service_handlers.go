@@ -16,69 +16,68 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
-func (s *Server) initHandlers() {
-	s.serviceHandlers = make(map[uint16]handlerFunc)
-	// s.registerHandler(id.ServiceFault_Encoding_DefaultBinary, handleServiceFault)
-	s.registerHandler(id.FindServersRequest_Encoding_DefaultBinary, handleFindServersRequest)
-	s.registerHandler(id.FindServersOnNetworkRequest_Encoding_DefaultBinary, handleFindServersOnNetworkRequest)
-	s.registerHandler(id.GetEndpointsRequest_Encoding_DefaultBinary, handleGetEndpointsRequest)
-	s.registerHandler(id.RegisterServerRequest_Encoding_DefaultBinary, handleRegisterServerRequest)
-	s.registerHandler(id.RegisterServer2Request_Encoding_DefaultBinary, handleRegisterServer2Request)
-	//s.registerHandler(id.OpenSecureChannelRequest_Encoding_DefaultBinary, handleOpenSecureChannelRequest)
-	//s.registerHandler(id.CloseSecureChannelRequest_Encoding_DefaultBinary, handleCloseSecureChannelRequest)
-	s.registerHandler(id.CreateSessionRequest_Encoding_DefaultBinary, handleCreateSessionRequest)
-	s.registerHandler(id.ActivateSessionRequest_Encoding_DefaultBinary, handleActivateSessionRequest)
-	s.registerHandler(id.CloseSessionRequest_Encoding_DefaultBinary, handleCloseSessionRequest)
-	s.registerHandler(id.CancelRequest_Encoding_DefaultBinary, handleCancelRequest)
-	s.registerHandler(id.AddNodesRequest_Encoding_DefaultBinary, handleAddNodesRequest)
-	s.registerHandler(id.AddReferencesRequest_Encoding_DefaultBinary, handleAddReferencesRequest)
-	s.registerHandler(id.DeleteNodesRequest_Encoding_DefaultBinary, handleDeleteNodesRequest)
-	s.registerHandler(id.DeleteReferencesRequest_Encoding_DefaultBinary, handleDeleteReferencesRequest)
-	s.registerHandler(id.BrowseRequest_Encoding_DefaultBinary, handleBrowseRequest)
-	s.registerHandler(id.BrowseNextRequest_Encoding_DefaultBinary, handleBrowseNextRequest)
-	s.registerHandler(id.TranslateBrowsePathsToNodeIDsRequest_Encoding_DefaultBinary, handleTranslateBrowsePathsToNodeIDsRequest)
-	s.registerHandler(id.RegisterNodesRequest_Encoding_DefaultBinary, handleRegisterNodesRequest)
-	s.registerHandler(id.UnregisterNodesRequest_Encoding_DefaultBinary, handleUnregisterNodesRequest)
-	s.registerHandler(id.QueryFirstRequest_Encoding_DefaultBinary, handleQueryFirstRequest)
-	s.registerHandler(id.QueryNextRequest_Encoding_DefaultBinary, handleQueryNextRequest)
-	s.registerHandler(id.ReadRequest_Encoding_DefaultBinary, handleReadRequest)
-	s.registerHandler(id.HistoryReadRequest_Encoding_DefaultBinary, handleHistoryReadRequest)
-	s.registerHandler(id.WriteRequest_Encoding_DefaultBinary, handleWriteRequest)
-	s.registerHandler(id.HistoryUpdateRequest_Encoding_DefaultBinary, handleHistoryUpdateRequest)
-	s.registerHandler(id.CallMethodRequest_Encoding_DefaultBinary, handleCallMethodRequest)
-	s.registerHandler(id.CallRequest_Encoding_DefaultBinary, handleCallRequest)
-	s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, handleMonitoredItemCreateRequest)
-	s.registerHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, handleCreateMonitoredItemsRequest)
-	s.registerHandler(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, handleMonitoredItemModifyRequest)
-	s.registerHandler(id.ModifyMonitoredItemsRequest_Encoding_DefaultBinary, handleModifyMonitoredItemsRequest)
-	s.registerHandler(id.SetMonitoringModeRequest_Encoding_DefaultBinary, handleSetMonitoringModeRequest)
-	s.registerHandler(id.SetTriggeringRequest_Encoding_DefaultBinary, handleSetTriggeringRequest)
-	s.registerHandler(id.DeleteMonitoredItemsRequest_Encoding_DefaultBinary, handleDeleteMonitoredItemsRequest)
-	s.registerHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, handleCreateSubscriptionRequest)
-	s.registerHandler(id.ModifySubscriptionRequest_Encoding_DefaultBinary, handleModifySubscriptionRequest)
-	s.registerHandler(id.SetPublishingModeRequest_Encoding_DefaultBinary, handleSetPublishingModeRequest)
-	s.registerHandler(id.PublishRequest_Encoding_DefaultBinary, handlePublishRequest)
-	s.registerHandler(id.RepublishRequest_Encoding_DefaultBinary, handleRepublishRequest)
-	s.registerHandler(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, handleTransferSubscriptionsRequest)
-	s.registerHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, handleDeleteSubscriptionsRequest)
+type Handler interface {
+	HandleOPCUA(*Server, *uasc.SecureChannel, ua.Request) (ua.Response, error)
 }
 
-// type response struct {
-// 	hdr *ua.ResponseHeader
-// }
+type HandlerFunc func(*Server, *uasc.SecureChannel, ua.Request) (ua.Response, error)
 
-// func (r *response) Header() *ua.ResponseHeader {
-// 	return r.hdr
-// }
+func (f HandlerFunc) HandleOPCUA(s *Server, sc *uasc.SecureChannel, req ua.Request) (ua.Response, error) {
+	return f(s, sc, req)
+}
 
-// func (r *response) SetHeader(hdr *ua.ResponseHeader) {
-// 	r.hdr = hdr
-// }
+func (s *Server) initHandlers() {
+	// s.registerHandlerFunc(id.ServiceFault_Encoding_DefaultBinary, handleServiceFault)
+	s.registerHandlerFunc(id.FindServersRequest_Encoding_DefaultBinary, handleFindServersRequest)
+	s.registerHandlerFunc(id.FindServersOnNetworkRequest_Encoding_DefaultBinary, handleFindServersOnNetworkRequest)
+	s.registerHandlerFunc(id.GetEndpointsRequest_Encoding_DefaultBinary, handleGetEndpointsRequest)
+	s.registerHandlerFunc(id.RegisterServerRequest_Encoding_DefaultBinary, handleRegisterServerRequest)
+	s.registerHandlerFunc(id.RegisterServer2Request_Encoding_DefaultBinary, handleRegisterServer2Request)
+	//s.registerHandlerFunc(id.OpenSecureChannelRequest_Encoding_DefaultBinary, handleOpenSecureChannelRequest)
+	//s.registerHandlerFunc(id.CloseSecureChannelRequest_Encoding_DefaultBinary, handleCloseSecureChannelRequest)
+	s.registerHandlerFunc(id.CreateSessionRequest_Encoding_DefaultBinary, handleCreateSessionRequest)
+	s.registerHandlerFunc(id.ActivateSessionRequest_Encoding_DefaultBinary, handleActivateSessionRequest)
+	s.registerHandlerFunc(id.CloseSessionRequest_Encoding_DefaultBinary, handleCloseSessionRequest)
+	s.registerHandlerFunc(id.CancelRequest_Encoding_DefaultBinary, handleCancelRequest)
+	s.registerHandlerFunc(id.AddNodesRequest_Encoding_DefaultBinary, handleAddNodesRequest)
+	s.registerHandlerFunc(id.AddReferencesRequest_Encoding_DefaultBinary, handleAddReferencesRequest)
+	s.registerHandlerFunc(id.DeleteNodesRequest_Encoding_DefaultBinary, handleDeleteNodesRequest)
+	s.registerHandlerFunc(id.DeleteReferencesRequest_Encoding_DefaultBinary, handleDeleteReferencesRequest)
+	s.registerHandlerFunc(id.BrowseRequest_Encoding_DefaultBinary, handleBrowseRequest)
+	s.registerHandlerFunc(id.BrowseNextRequest_Encoding_DefaultBinary, handleBrowseNextRequest)
+	s.registerHandlerFunc(id.TranslateBrowsePathsToNodeIDsRequest_Encoding_DefaultBinary, handleTranslateBrowsePathsToNodeIDsRequest)
+	s.registerHandlerFunc(id.RegisterNodesRequest_Encoding_DefaultBinary, handleRegisterNodesRequest)
+	s.registerHandlerFunc(id.UnregisterNodesRequest_Encoding_DefaultBinary, handleUnregisterNodesRequest)
+	s.registerHandlerFunc(id.QueryFirstRequest_Encoding_DefaultBinary, handleQueryFirstRequest)
+	s.registerHandlerFunc(id.QueryNextRequest_Encoding_DefaultBinary, handleQueryNextRequest)
+	s.registerHandlerFunc(id.ReadRequest_Encoding_DefaultBinary, handleReadRequest)
+	s.registerHandlerFunc(id.HistoryReadRequest_Encoding_DefaultBinary, handleHistoryReadRequest)
+	s.registerHandlerFunc(id.WriteRequest_Encoding_DefaultBinary, handleWriteRequest)
+	s.registerHandlerFunc(id.HistoryUpdateRequest_Encoding_DefaultBinary, handleHistoryUpdateRequest)
+	s.registerHandlerFunc(id.CallMethodRequest_Encoding_DefaultBinary, handleCallMethodRequest)
+	s.registerHandlerFunc(id.CallRequest_Encoding_DefaultBinary, handleCallRequest)
+	s.registerHandlerFunc(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, handleMonitoredItemCreateRequest)
+	s.registerHandlerFunc(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, handleCreateMonitoredItemsRequest)
+	s.registerHandlerFunc(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, handleMonitoredItemModifyRequest)
+	s.registerHandlerFunc(id.ModifyMonitoredItemsRequest_Encoding_DefaultBinary, handleModifyMonitoredItemsRequest)
+	s.registerHandlerFunc(id.SetMonitoringModeRequest_Encoding_DefaultBinary, handleSetMonitoringModeRequest)
+	s.registerHandlerFunc(id.SetTriggeringRequest_Encoding_DefaultBinary, handleSetTriggeringRequest)
+	s.registerHandlerFunc(id.DeleteMonitoredItemsRequest_Encoding_DefaultBinary, handleDeleteMonitoredItemsRequest)
+	s.registerHandlerFunc(id.CreateSubscriptionRequest_Encoding_DefaultBinary, handleCreateSubscriptionRequest)
+	s.registerHandlerFunc(id.ModifySubscriptionRequest_Encoding_DefaultBinary, handleModifySubscriptionRequest)
+	s.registerHandlerFunc(id.SetPublishingModeRequest_Encoding_DefaultBinary, handleSetPublishingModeRequest)
+	s.registerHandlerFunc(id.PublishRequest_Encoding_DefaultBinary, handlePublishRequest)
+	s.registerHandlerFunc(id.RepublishRequest_Encoding_DefaultBinary, handleRepublishRequest)
+	s.registerHandlerFunc(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, handleTransferSubscriptionsRequest)
+	s.registerHandlerFunc(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, handleDeleteSubscriptionsRequest)
+}
 
-type handlerFunc func(*Server, *uasc.SecureChannel, ua.Request) (ua.Response, error)
+func (s *Server) registerHandler(typeID uint16, h Handler) {
+	s.handlers[typeID] = h
+}
 
-func (s *Server) registerHandler(typeID uint16, f handlerFunc) {
-	s.serviceHandlers[typeID] = f
+func (s *Server) registerHandlerFunc(typeID uint16, f HandlerFunc) {
+	s.registerHandler(typeID, f)
 }
 
 func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqID uint32, req ua.Request) {
@@ -88,9 +87,9 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqI
 	var err error
 
 	typeID := ua.ServiceTypeID(req)
-	h, ok := s.serviceHandlers[typeID]
+	h, ok := s.handlers[typeID]
 	if ok {
-		resp, err = h(s, sc, req)
+		resp, err = h.HandleOPCUA(s, sc, req)
 	} else {
 		if typeID == 0 {
 			debug.Printf("unknown service %T. Did you call register?", req)

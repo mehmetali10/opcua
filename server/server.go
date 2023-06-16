@@ -46,7 +46,7 @@ type Server struct {
 
 	// Service Handlers are methods called to respond to service requests from clients
 	// All services should have a method here.
-	serviceHandlers map[uint16]handlerFunc
+	handlers map[uint16]Handler
 }
 
 type serverConfig struct {
@@ -76,10 +76,11 @@ func New(url string, opts ...Option) *Server {
 		opt(cfg)
 	}
 	return &Server{
-		url: url,
-		cfg: cfg,
-		cb:  newChannelBroker(),
-		sb:  newSessionBroker(),
+		url:      url,
+		cfg:      cfg,
+		cb:       newChannelBroker(),
+		sb:       newSessionBroker(),
+		handlers: make(map[uint16]Handler),
 		namespaces: []string{
 			"http://opcfoundation.org/UA/", // ns:0
 		},
