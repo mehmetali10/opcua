@@ -61,6 +61,7 @@ func main() {
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "MyValueNode"}),
 		},
+		nil,
 	))
 
 	opts = append(opts, server.UserAddressSpace(uas))

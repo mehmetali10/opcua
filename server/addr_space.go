@@ -21,12 +21,11 @@ type node struct {
 	id    *ua.NodeID
 	value func() *ua.Variant
 	attr  map[ua.AttributeID]*ua.Variant
-
-	superTypeID *ua.NodeID
+	refs  []*ua.ReferenceDescription
 }
 
-func NewNode(id *ua.NodeID, v func() *ua.Variant, attr map[ua.AttributeID]*ua.Variant) *node {
-	return &node{id, v, attr, ua.NewTwoByteNodeID(0)}
+func NewNode(id *ua.NodeID, v func() *ua.Variant, attr map[ua.AttributeID]*ua.Variant, refs []*ua.ReferenceDescription) *node {
+	return &node{id: id, value: v, attr: attr, refs: refs}
 }
 
 func (n *node) ID() *ua.NodeID {

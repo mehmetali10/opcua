@@ -12,8 +12,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 	"text/template"
 
+	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/server/refs"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -31,7 +34,7 @@ func main() {
 	}
 	defer f.Close()
 
-	var nodes []Node
+	var nodes []*Node
 	d := xml.NewDecoder(f)
 	for {
 		tok, err := d.Token()
@@ -48,8 +51,8 @@ func main() {
 			if ty.Name.Space != "http://opcfoundation.org/UA/" {
 				continue
 			}
-			var n Node
-			if err := d.DecodeElement(&n, &ty); err != nil {
+			n := new(Node)
+			if err := d.DecodeElement(n, &ty); err != nil {
 				log.Fatal(err)
 			}
 			n.Type = ty.Name.Local
@@ -57,6 +60,24 @@ func main() {
 			// fmt.Printf("%#v\n", n)
 			nodes = append(nodes, n)
 		}
+	}
+
+	m := map[string]*Node{}
+	for _, n := range nodes {
+		// trim the _xx suffix from the node class
+		n.NodeClass = n.NodeClass[0:strings.Index(n.NodeClass, "_")] // DataType_32 -> DataType
+
+		m[n.NodeID.Identifier.String()] = n
+	}
+
+	// create HasSubtype refs
+	for _, n := range m {
+		sid := n.SuperTypeID.Identifier.String()
+		if sid == "" {
+			continue
+		}
+		ref := refs.HasSubtype(&ua.ExpandedNodeID{NodeID: n.NodeID.Identifier})
+		m[sid].Refs = append(m[sid].Refs, ref)
 	}
 
 	data := map[string]interface{}{
@@ -103,37 +124,52 @@ type Node struct {
 		Text   string
 	}
 	IsAbstract bool
+
+	Refs []*ua.ReferenceDescription
 }
 
-var tmpl = template.Must(template.New("").Parse(`// Generated code. DO NOT EDIT
+var funcs = template.FuncMap{
+	"idname": id.Name,
+}
+
+var tmpl = template.Must(template.New("").Funcs(funcs).Parse(`// Generated code. DO NOT EDIT
  // Copyright 2018-2023 opcua authors. All rights reserved.
  // Use of this source code is governed by a MIT-style license that can be
  // found in the LICENSE file.
  package {{.Package}}
 
- import "github.com/gopcua/opcua/ua"
+ import (
+	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/ua"
+ )
 
  func PredefinedNodes() []Node{
  	return []Node{
  {{- range .Nodes }}
- {{- if not .IsAbstract }}
  		&node{
  			{{- with .NodeID.Identifier }}
  			id: ua.NewNumericNodeID({{.Namespace}}, {{.IntID}}),
  			{{- end}}
  			attr: map[ua.AttributeID]*ua.Variant{
- 				ua.AttributeIDNodeClass: ua.MustVariant("{{.NodeClass}}"),
- 				ua.AttributeIDBrowseName: ua.MustVariant("{{.BrowseName.Name}}"),
- 				ua.AttributeIDDisplayName: ua.MustVariant("{{.BrowseName.Name}}"),
+ 				ua.AttributeIDNodeClass: ua.MustVariant(ua.NodeClass{{.NodeClass}}),
+ 				ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name:"{{.BrowseName.Name}}"}),
+ 				ua.AttributeIDDisplayName: ua.MustVariant(&ua.LocalizedText{Text:"{{.BrowseName.Name}}"}),
  				{{- with .InverseName }}
  				ua.AttributeIDInverseName: ua.MustVariant(&ua.LocalizedText{Locale:"{{.Locale}}", Text:"{{.Text}}"}),
  				{{- end}}
  			},
- 			{{- with .SuperTypeID.Identifier }}
- 			superTypeID: ua.NewNumericNodeID({{.Namespace}}, {{.IntID}}),
- 			{{- end}}
+			{{- if .Refs }}
+			refs: []*ua.ReferenceDescription{
+			{{- range .Refs }}
+				{
+					ReferenceTypeID: ua.NewNumericNodeID(0, id.{{idname .ReferenceTypeID.IntID}}),
+					TypeDefinition: ua.NewNumericExpandedNodeID(0, {{.TypeDefinition.NodeID.IntID}}),
+					IsForward: {{.IsForward}},
+				},
+ 			{{- end }}
+			},
+			{{- end }}
  		},
- {{- end }}
  {{- end }}
  	}
  }
