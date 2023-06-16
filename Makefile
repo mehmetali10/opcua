@@ -22,7 +22,8 @@ install-py-opcua:
 	pip3 install opcua
 
 gen:
-	go install golang.org/x/tools/cmd/stringer@latest
+	which stringer || go install golang.org/x/tools/cmd/stringer@latest
+	find . -name '*_gen.go' -delete
 	go generate ./...
 
 release:
