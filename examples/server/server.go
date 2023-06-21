@@ -15,6 +15,7 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/server"
+	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -53,19 +54,6 @@ func main() {
 		//		server.EnableAuthWithoutEncryption(), // Dangerous and not recommended, shown for illustration only
 	)
 
-	// create a user address space
-	uas := server.NewSyncAS()
-	uas.AddNodes(server.NewNode(
-		ua.NewNumericNodeID(0, 9999),
-		func() *ua.Variant { return ua.MustVariant("MyValue") },
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "MyValueNode"}),
-		},
-		nil,
-	))
-
-	opts = append(opts, server.UserAddressSpace(uas))
-
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
 		debug.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
@@ -83,6 +71,16 @@ func main() {
 	}
 
 	s := server.New(*endpoint, opts...)
+	obj, _ := s.AddressSpace().Objects()
+	obj.AddVariable(server.NewNode(
+		ua.NewNumericNodeID(0, 9999),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("MyValueNode")),
+		},
+		nil,
+		func() *ua.Variant { return ua.MustVariant("MyValue") },
+	))
+
 	if err := s.Start(context.Background()); err != nil {
 		log.Fatalf("Error starting server, exiting: %s", err)
 	}

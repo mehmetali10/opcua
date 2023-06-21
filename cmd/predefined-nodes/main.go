@@ -140,26 +140,26 @@ var tmpl = template.Must(template.New("").Funcs(funcs).Parse(`// Generated code.
 
  import (
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
  )
 
- func PredefinedNodes() []Node{
- 	return []Node{
+ func PredefinedNodes() []*Node{
+ 	return []*Node{
  {{- range .Nodes }}
- 		&node{
+ 		NewNode(
  			{{- with .NodeID.Identifier }}
- 			id: ua.NewNumericNodeID({{.Namespace}}, {{.IntID}}),
+ 			ua.NewNumericNodeID({{.Namespace}}, {{.IntID}}),
  			{{- end}}
- 			attr: map[ua.AttributeID]*ua.Variant{
- 				ua.AttributeIDNodeClass: ua.MustVariant(ua.NodeClass{{.NodeClass}}),
- 				ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name:"{{.BrowseName.Name}}"}),
- 				ua.AttributeIDDisplayName: ua.MustVariant(&ua.LocalizedText{Text:"{{.BrowseName.Name}}"}),
+ 			map[ua.AttributeID]*ua.Variant{
+ 				ua.AttributeIDNodeClass: ua.MustVariant(uint32(ua.NodeClass{{.NodeClass}})),
+ 				ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("{{.BrowseName.Name}}")),
+ 				ua.AttributeIDDisplayName: ua.MustVariant(attrs.DisplayName("{{.BrowseName.Name}}", "")),
  				{{- with .InverseName }}
- 				ua.AttributeIDInverseName: ua.MustVariant(&ua.LocalizedText{Locale:"{{.Locale}}", Text:"{{.Text}}"}),
+ 				ua.AttributeIDInverseName: ua.MustVariant(attrs.InverseName("{{.Text}}", "{{.Locale}}")),
  				{{- end}}
  			},
-			{{- if .Refs }}
-			refs: []*ua.ReferenceDescription{
+			[]*ua.ReferenceDescription{
 			{{- range .Refs }}
 				{
 					ReferenceTypeID: ua.NewNumericNodeID(0, id.{{idname .ReferenceTypeID.IntID}}),
@@ -168,8 +168,8 @@ var tmpl = template.Must(template.New("").Funcs(funcs).Parse(`// Generated code.
 				},
  			{{- end }}
 			},
-			{{- end }}
- 		},
+			nil,
+		),
  {{- end }}
  	}
  }

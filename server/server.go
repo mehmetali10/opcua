@@ -40,7 +40,7 @@ type Server struct {
 	l  *uacp.Listener
 	cb *channelBroker
 	sb *sessionBroker
-	as AddressSpace
+	as *AddressSpace
 
 	// nextSecureChannelID uint32
 
@@ -50,13 +50,28 @@ type Server struct {
 }
 
 type serverConfig struct {
-	uas            AddressSpace
 	privateKey     *rsa.PrivateKey
 	certificate    []byte
 	applicationURI string
 
 	enabledSec  []security
 	enabledAuth []authMode
+
+	cap ServerCapabilities
+}
+
+var capabilities = ServerCapabilities{
+	OperationalLimits: OperationalLimits{
+		MaxNodesPerRead: 32,
+	},
+}
+
+type ServerCapabilities struct {
+	OperationalLimits OperationalLimits
+}
+
+type OperationalLimits struct {
+	MaxNodesPerRead uint32
 }
 
 type authMode struct {
@@ -71,15 +86,18 @@ type security struct {
 // New returns an initialized OPC-UA server.
 // Call Start() afterwards to begin listening and serving connections
 func New(url string, opts ...Option) *Server {
-	cfg := &serverConfig{}
+	cfg := &serverConfig{
+		cap: capabilities,
+	}
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	return &Server{
+	s := &Server{
 		url:      url,
 		cfg:      cfg,
 		cb:       newChannelBroker(),
 		sb:       newSessionBroker(),
+		as:       NewAddressSpace(),
 		handlers: make(map[uint16]Handler),
 		namespaces: []string{
 			"http://opcfoundation.org/UA/", // ns:0
@@ -100,6 +118,19 @@ func New(url string, opts ...Option) *Server {
 			ShutdownReason:      &ua.LocalizedText{},
 		},
 	}
+
+	// init server address space
+	for _, n := range PredefinedNodes() {
+		s.as.AddNode(n)
+	}
+	s.as.AddNode(CurrentTimeNode())
+	s.as.AddNode(NamespacesNode(s))
+	s.as.AddNode(ServerStatusNode(s))
+	for _, n := range ServerCapabilitiesNodes(s) {
+		s.as.AddNode(n)
+	}
+
+	return s
 }
 
 func (s *Server) Namespaces() []string {
@@ -116,6 +147,10 @@ func (s *Server) AddNamespace(ns string) int {
 	}
 	s.namespaces = append(s.namespaces, ns)
 	return len(s.namespaces)
+}
+
+func (s *Server) AddressSpace() *AddressSpace {
+	return s.as
 }
 
 // Status returns the current server status.
@@ -142,25 +177,6 @@ func (s *Server) URL() string {
 func (s *Server) Start(ctx context.Context) error {
 	var err error
 
-	// init server address space
-	nodes := PredefinedNodes()
-	nodes = append(nodes, CurrentTimeNode())
-	nodes = append(nodes, NamespacesNode(s))
-	nodes = append(nodes, ServerStatusNode(s))
-	sas := NewSyncAS()
-	if err := sas.AddNodes(nodes...); err != nil {
-		return err
-	}
-
-	// init user address space
-	uas := s.cfg.uas
-	if uas == nil {
-		uas = NewSyncAS()
-	}
-
-	// merge server and user address space
-	s.as = NewMergeAS(sas, uas)
-
 	// Register all service handlers
 	s.initHandlers()
 
@@ -184,6 +200,19 @@ func (s *Server) Start(ctx context.Context) error {
 	go s.monitorConnections(ctx)
 
 	return nil
+}
+
+func (s *Server) RegisterNamespace(ns string) uint16 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, url := range s.namespaces {
+		if ns == url {
+			return uint16(i)
+		}
+	}
+	// todo(fs): check for correct format (if there is one)
+	s.namespaces = append(s.namespaces, ns)
+	return uint16(len(s.namespaces))
 }
 
 func (s *Server) setServerState(state ua.ServerState) {

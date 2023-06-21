@@ -7,6 +7,7 @@ package server
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"log"
 	"time"
 
@@ -483,14 +484,75 @@ func handleBrowseRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Re
 		return nil, ua.StatusBadRequestTypeInvalid
 	}
 
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.BrowseResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
+	resp := &ua.BrowseResponse{
+		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+		Results:        make([]*ua.BrowseResult, len(req.NodesToBrowse)),
+	}
 
-	return response, nil
+	for i, bd := range req.NodesToBrowse {
+		n, err := s.as.Node(bd.NodeID)
+		if err != nil {
+			switch x := err.(type) {
+			case ua.StatusCode:
+				resp.Results[i] = &ua.BrowseResult{StatusCode: x}
+			default:
+				resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBadInternalError}
+			}
+			continue
+		}
+		fmt.Printf("handleBrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
+
+		refs := []*ua.ReferenceDescription{
+			{
+				ReferenceTypeID: ua.NewTwoByteNodeID(0),
+				IsForward:       false,
+				NodeID:          ua.NewTwoByteExpandedNodeID(0),
+				BrowseName:      &ua.QualifiedName{},
+				DisplayName:     &ua.LocalizedText{},
+				NodeClass:       0,
+				TypeDefinition:  ua.NewTwoByteExpandedNodeID(0),
+			},
+		}
+
+		mask := ua.BrowseResultMask(bd.ResultMask)
+		if mask&ua.BrowseResultMaskReferenceTypeID > 0 {
+			// if v, err := n.Attribute(ua.AttributeIDBrowseName); err == nil {
+			// 	refs[0].BrowseName = v.Value.QualifiedName()
+			// }
+		}
+		if mask&ua.BrowseResultMaskIsForward > 0 {
+			// refs[0].IsForward = true
+		}
+		if mask&ua.BrowseResultMaskBrowseName > 0 {
+			if v, err := n.Attribute(ua.AttributeIDBrowseName); err == nil {
+				refs[0].BrowseName = v.Value.QualifiedName()
+			}
+		}
+		if mask&ua.BrowseResultMaskDisplayName > 0 {
+			if v, err := n.Attribute(ua.AttributeIDDisplayName); err == nil {
+				refs[0].DisplayName = v.Value.LocalizedText()
+			}
+		}
+		if mask&ua.BrowseResultMaskNodeClass > 0 {
+			if v, err := n.Attribute(ua.AttributeIDNodeClass); err == nil {
+				refs[0].NodeClass = ua.NodeClass(v.Value.Uint())
+			}
+		}
+		if mask&ua.BrowseResultMaskTypeDefinition > 0 {
+			if v, err := n.Attribute(ua.AttributeIDDataType); err == nil {
+				refs[0].TypeDefinition = v.Value.ExpandedNodeID()
+			}
+		}
+
+		// todo(fs): handle references and isForward
+
+		resp.Results[i] = &ua.BrowseResult{
+			StatusCode: ua.StatusGood,
+			References: refs,
+		}
+	}
+
+	return resp, nil
 }
 
 func handleBrowseNextRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
@@ -623,6 +685,14 @@ func handleReadRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Resp
 		dv := &ua.DataValue{
 			EncodingMask:    ua.DataValueServerTimestamp,
 			ServerTimestamp: time.Now(),
+		}
+
+		node, err := s.as.Node(n.NodeID)
+		switch err {
+		case ua.StatusGood:
+			debug.Printf("read: node=%s browseName=%v", n.NodeID, node.BrowseName())
+		default:
+			debug.Printf("read: node=%s err=%s", n.NodeID, err)
 		}
 
 		v, err := s.as.Attribute(n.NodeID, n.AttributeID)

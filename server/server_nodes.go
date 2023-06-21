@@ -4,46 +4,65 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
 )
 
-func CurrentTimeNode() *node {
-	return &node{
-		id:    ua.NewNumericNodeID(0, 2258),
-		value: func() *ua.Variant { return ua.MustVariant(time.Now()) },
-		attr: map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "CurrentTime"}),
+func CurrentTimeNode() *Node {
+	return NewNode(
+		ua.NewNumericNodeID(0, 2258),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("CurrentTime")),
 		},
-	}
+		nil,
+		func() *ua.Variant { return ua.MustVariant(time.Now()) },
+	)
 }
 
-func NamespacesNode(s *Server) *node {
-	return &node{
-		id:    ua.NewNumericNodeID(0, 2255),
-		value: func() *ua.Variant { return ua.MustVariant(s.Namespaces()) },
-		attr: map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "Namespaces"}),
+func NamespacesNode(s *Server) *Node {
+	return NewNode(
+		ua.NewNumericNodeID(0, 2255),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Namespaces")),
 		},
-	}
+		nil,
+		func() *ua.Variant { return ua.MustVariant(s.Namespaces()) },
+	)
 }
 
-func ServerStatusNode(s *Server) *node {
-	return &node{
-		id:    ua.NewNumericNodeID(0, 2256),
-		value: func() *ua.Variant { return ua.MustVariant(ua.NewExtensionObject(s.Status())) },
-		attr: map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "ServerStatus"}),
+func ServerStatusNode(s *Server) *Node {
+	return NewNode(
+		ua.NewNumericNodeID(0, 2256),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("ServerStatus")),
 		},
-	}
+		nil,
+		func() *ua.Variant { return ua.MustVariant(ua.NewExtensionObject(s.Status())) },
+	)
 }
 
-func RootNode(s *Server) *node {
-	return &node{
-		id: ua.NewNumericNodeID(0, id.RootFolder),
-		attr: map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:  ua.MustVariant(ua.NodeClassObject),
+func ServerCapabilitiesNodes(s *Server) []*Node {
+	var nodes []*Node
+	nodes = append(nodes, NewNode(
+		ua.NewNumericNodeID(0, id.Server_ServerCapabilities_OperationLimits_MaxNodesPerRead),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("MaxNodesPerRead")),
+		},
+		nil,
+		func() *ua.Variant { return ua.MustVariant(s.cfg.cap.OperationalLimits.MaxNodesPerRead) },
+	))
+	return nodes
+}
+
+func RootNode() *Node {
+	return NewNode(
+		ua.NewNumericNodeID(0, id.RootFolder),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDNodeClass:  ua.MustVariant(attrs.NodeClass(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Root")),
 			ua.AttributeIDDataType:   ua.MustVariant(ua.NewNumericExpandedNodeID(0, id.DataTypesFolder)),
-			ua.AttributeIDBrowseName: ua.MustVariant(&ua.QualifiedName{Name: "Root"}),
 		},
-	}
+		nil,
+		nil,
+	)
 }

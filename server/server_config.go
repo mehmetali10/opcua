@@ -20,13 +20,6 @@ import (
 // Option is an option function type to modify the configuration.
 type Option func(*serverConfig)
 
-// UserAddressSpace contains the user defined nodes.
-func UserAddressSpace(as AddressSpace) Option {
-	return func(s *serverConfig) {
-		s.uas = as
-	}
-}
-
 // PrivateKey sets the RSA private key in the secure channel configuration.
 func PrivateKey(key *rsa.PrivateKey) Option {
 	return func(s *serverConfig) {

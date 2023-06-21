@@ -6,128 +6,72 @@ package server
 
 import (
 	"sync"
-	"time"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
 
-type Node interface {
-	ID() *ua.NodeID
-	Value() *ua.Variant
-	Attribute(ua.AttributeID) (*AttrValue, error)
+var (
+	ObjectsFolder = ua.NewNumericNodeID(0, id.ObjectsFolder)
+	RootFolder    = ua.NewNumericNodeID(0, id.RootFolder)
+)
+
+type AddressSpace struct {
+	mu    sync.Mutex
+	nodes []*Node
+	m     map[string]*Node
 }
 
-type node struct {
-	id    *ua.NodeID
-	value func() *ua.Variant
-	attr  map[ua.AttributeID]*ua.Variant
-	refs  []*ua.ReferenceDescription
+func NewAddressSpace() *AddressSpace {
+	return &AddressSpace{m: map[string]*Node{}}
 }
 
-func NewNode(id *ua.NodeID, v func() *ua.Variant, attr map[ua.AttributeID]*ua.Variant, refs []*ua.ReferenceDescription) *node {
-	return &node{id: id, value: v, attr: attr, refs: refs}
-}
+func (as *AddressSpace) AddNode(n *Node) *Node {
+	as.mu.Lock()
+	defer as.mu.Unlock()
 
-func (n *node) ID() *ua.NodeID {
-	return n.id
-}
-
-func (n *node) Value() *ua.Variant {
-	return n.value()
-}
-
-func (n *node) Attribute(id ua.AttributeID) (*AttrValue, error) {
-	if n.attr == nil {
-		return nil, ua.StatusBadAttributeIDInvalid
+	nn := &Node{
+		id:   n.id,
+		attr: maps.Clone(n.attr),
+		refs: slices.Clone(n.refs),
+		val:  n.val,
+		as:   as,
 	}
-	if v := n.attr[id]; v != nil {
-		return NewAttrValue(v), nil
-	}
-	return nil, ua.StatusBadAttributeIDInvalid
+
+	// todo(fs): this is wrong since this leaves the old node in the list.
+	as.nodes = append(as.nodes, nn)
+	as.m[nn.ID().String()] = nn
+	return nn
 }
 
-type AttrValue struct {
-	Value           *ua.Variant
-	SourceTimestamp time.Time
-}
-
-func NewAttrValue(v *ua.Variant) *AttrValue {
-	return &AttrValue{Value: v}
-}
-
-type AddressSpace interface {
-	Attribute(*ua.NodeID, ua.AttributeID) (*AttrValue, error)
-	Node(*ua.NodeID) (Node, error)
-}
-
-// MergeAS merges multiple address spaces in ascending order.
-type MergeAS struct {
-	as []AddressSpace
-}
-
-func NewMergeAS(as ...AddressSpace) *MergeAS {
-	return &MergeAS{as}
-}
-
-func (s *MergeAS) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
-	n, err := s.Node(id)
-	if err != nil {
+func (as *AddressSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
+	n, err := as.Node(id)
+	if err != ua.StatusGood {
 		return nil, err
 	}
 	return n.Attribute(attr)
 }
 
-func (s *MergeAS) Node(id *ua.NodeID) (Node, error) {
-	for _, as := range s.as {
-		n, err := as.Node(id)
-		if err == ua.StatusBadNodeIDUnknown {
-			continue
-		}
-		return n, err
+func (as *AddressSpace) Node(id *ua.NodeID) (*Node, error) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	if id == nil {
+		return nil, ua.StatusBadNodeIDUnknown
 	}
-	return nil, ua.StatusBadNodeIDUnknown
-}
-
-// SyncAS implements a mutable address space which is safe for concurrent access.
-type SyncAS struct {
-	mu    sync.Mutex
-	nodes map[string]Node
-}
-
-func NewSyncAS() *SyncAS {
-	return &SyncAS{nodes: make(map[string]Node)}
-}
-
-func (a *SyncAS) AddNodes(nodes ...Node) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for _, n := range nodes {
-		a.nodes[n.ID().String()] = n
-	}
-	return nil
-}
-
-func (a *SyncAS) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	n := a.nodes[id.String()]
+	n := as.m[id.String()]
 	if n == nil {
 		return nil, ua.StatusBadNodeIDUnknown
 	}
-	return n.Attribute(attr)
+	return n, ua.StatusGood
 }
 
-func (a *SyncAS) Node(id *ua.NodeID) (Node, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	n := a.nodes[id.String()]
-	if n == nil {
-		return nil, ua.StatusBadNodeIDUnknown
-	}
-	return n, nil
+func (as *AddressSpace) Objects() (*Node, error) {
+	return as.Node(ObjectsFolder)
 }
 
-// interface compliance
-var _ Node = (*node)(nil)
-var _ AddressSpace = (*MergeAS)(nil)
-var _ AddressSpace = (*SyncAS)(nil)
+func (as *AddressSpace) Root() (*Node, error) {
+	return as.Node(RootFolder)
+}
