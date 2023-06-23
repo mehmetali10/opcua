@@ -153,6 +153,12 @@ func (s *Server) AddressSpace() *AddressSpace {
 	return s.as
 }
 
+func (s *Server) Endpoints() []*ua.EndpointDescription {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.endpoints)
+}
+
 // Status returns the current server status.
 func (s *Server) Status() *ua.ServerStatusDataType {
 	status := new(ua.ServerStatusDataType)

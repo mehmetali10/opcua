@@ -1,0 +1,199 @@
+package server
+
+import (
+	"golang.org/x/exp/slices"
+
+	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uasc"
+)
+
+var (
+	hasSubtype = ua.NewNumericNodeID(0, id.HasSubtype)
+)
+
+type ViewService struct {
+	srv *Server
+}
+
+func (s *ViewService) BrowseRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+	debug.Printf("Handling %T\n", r)
+
+	req, ok := r.(*ua.BrowseRequest)
+	if !ok {
+		debug.Printf("BrowseRequest: Expected *ua.BrowseRequest, got %T", r)
+		return nil, ua.StatusBadRequestTypeInvalid
+	}
+
+	resp := &ua.BrowseResponse{
+		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+		Results:        make([]*ua.BrowseResult, len(req.NodesToBrowse)),
+	}
+
+	count := len(req.NodesToBrowse)
+	debug.Printf("BrowseRequest: len(req.NodesToBrowse)=%d", count)
+
+	for i, bd := range req.NodesToBrowse {
+		node := s.srv.AddressSpace().Node(bd.NodeID)
+		if node == nil {
+			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBadNodeIDUnknown}
+			continue
+		}
+		debug.Printf("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
+
+		var refs []*ua.ReferenceDescription
+		for _, ref := range node.refs {
+			if !s.suitableRef(bd, ref) {
+				continue
+			}
+			refs = append(refs, ref)
+		}
+
+		resp.Results[i] = &ua.BrowseResult{
+			StatusCode: ua.StatusGood,
+			References: refs,
+		}
+	}
+
+	return resp, nil
+}
+
+func (s *ViewService) suitableRef(desc *ua.BrowseDescription, ref *ua.ReferenceDescription) bool {
+	if !suitableDirection(desc.BrowseDirection, ref.IsForward) {
+		debug.Printf("%v not suitable because of direction", ref)
+		return false
+	}
+	if !s.suitableRefType(desc.ReferenceTypeID, ref.ReferenceTypeID, desc.IncludeSubtypes) {
+		debug.Printf("%v not suitable because of ref type", ref)
+		return false
+	}
+	if desc.NodeClassMask > 0 && desc.NodeClassMask&uint32(ref.NodeClass) == 0 {
+		debug.Printf("%v not suitable because of node class", ref)
+		return false
+	}
+	return true
+}
+
+func suitableDirection(bd ua.BrowseDirection, isForward bool) bool {
+	switch {
+	case bd == ua.BrowseDirectionBoth:
+		return true
+	case bd == ua.BrowseDirectionForward && isForward:
+		return true
+	case bd == ua.BrowseDirectionInverse && !isForward:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *ViewService) suitableRefType(ref1, ref2 *ua.NodeID, subtypes bool) bool {
+	if ref1.Equal(ua.NewNumericNodeID(0, 0)) {
+		// refType is not specified in browse description. Return all types
+		return true
+	}
+	if ref1.Equal(ref2) {
+		return true
+	}
+	hasRef2Fn := func(nid *ua.NodeID) bool { return nid.Equal(ref2) }
+	hasSubtypeFn := func(nid *ua.NodeID) bool { return nid.Equal(hasSubtype) }
+	oktypes := s.getSubRefs(ref1)
+	if !subtypes && slices.ContainsFunc(oktypes, hasSubtypeFn) {
+		for n := slices.IndexFunc(oktypes, hasSubtypeFn); n > 0; {
+			slices.Delete(oktypes, n, n+1)
+		}
+	}
+	return slices.ContainsFunc(oktypes, hasRef2Fn)
+}
+
+func (s *ViewService) getSubRefs(nid *ua.NodeID) []*ua.NodeID {
+	var refs []*ua.NodeID
+	node := s.srv.AddressSpace().Node(nid)
+	if node == nil {
+		return nil
+	}
+	for _, ref := range node.refs {
+		if ref.ReferenceTypeID.Equal(hasSubtype) && ref.IsForward {
+			refs = append(refs, ref.NodeID.NodeID)
+			refs = append(refs, s.getSubRefs(ref.NodeID.NodeID)...)
+		}
+	}
+	return refs
+}
+
+func (s *ViewService) BrowseNextRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+	debug.Printf("Handling %T\n", r)
+
+	req, ok := r.(*ua.BrowseNextRequest)
+	if !ok {
+		debug.Printf("BrowseNextRequest: Expected *ua.BrowseNextRequest, got %T", r)
+		return nil, ua.StatusBadRequestTypeInvalid
+	}
+
+	//TODO: Replace with proper response once implemented
+	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
+	// response := &ua.BrowseNextResponse{
+	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+	//  ... remaining fields
+	//}
+
+	return response, nil
+}
+
+func (s *ViewService) TranslateBrowsePathsToNodeIDsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+	debug.Printf("Handling %T\n", r)
+
+	req, ok := r.(*ua.TranslateBrowsePathsToNodeIDsRequest)
+	if !ok {
+		debug.Printf("TranslateBrowsePathsToNodeIDsRequest: Expected *ua.TranslateBrowsePathsToNodeIDsRequest, got %T", r)
+		return nil, ua.StatusBadRequestTypeInvalid
+	}
+
+	//TODO: Replace with proper response once implemented
+	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
+	// response := &ua.TranslateBrowsePathsToNodeIDsResponse{
+	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+	//  ... remaining fields
+	//}
+
+	return response, nil
+}
+
+func (s *ViewService) RegisterNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+	debug.Printf("Handling %T\n", r)
+
+	req, ok := r.(*ua.RegisterNodesRequest)
+	if !ok {
+		debug.Printf("RegisterNodesRequest: Expected *ua.RegisterNodesRequest, got %T", r)
+		return nil, ua.StatusBadRequestTypeInvalid
+	}
+
+	//TODO: Replace with proper response once implemented
+	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
+	// response := &ua.RegisterNodesResponse{
+	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+	//  ... remaining fields
+	//}
+
+	return response, nil
+}
+
+func (s *ViewService) UnregisterNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+	debug.Printf("Handling %T\n", r)
+
+	req, ok := r.(*ua.UnregisterNodesRequest)
+	if !ok {
+		debug.Printf("UnregisterNodesRequest: Expected *ua.UnregisterNodesRequest, got %T", r)
+		return nil, ua.StatusBadRequestTypeInvalid
+	}
+
+	//TODO: Replace with proper response once implemented
+	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
+	// response := &ua.UnregisterNodesResponse{
+	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+	//  ... remaining fields
+	//}
+
+	return response, nil
+}
