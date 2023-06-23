@@ -13,10 +13,14 @@ var (
 	hasSubtype = ua.NewNumericNodeID(0, id.HasSubtype)
 )
 
+// ViewService implements the View Service Set.
+//
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8
 type ViewService struct {
 	srv *Server
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
 func (s *ViewService) BrowseRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -122,6 +126,7 @@ func (s *ViewService) getSubRefs(nid *ua.NodeID) []*ua.NodeID {
 	return refs
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.3
 func (s *ViewService) BrowseNextRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -141,6 +146,7 @@ func (s *ViewService) BrowseNextRequest(sc *uasc.SecureChannel, r ua.Request) (u
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.4
 func (s *ViewService) TranslateBrowsePathsToNodeIDsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -160,6 +166,7 @@ func (s *ViewService) TranslateBrowsePathsToNodeIDsRequest(sc *uasc.SecureChanne
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.5
 func (s *ViewService) RegisterNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -179,6 +186,7 @@ func (s *ViewService) RegisterNodesRequest(sc *uasc.SecureChannel, r ua.Request)
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.6
 func (s *ViewService) UnregisterNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 

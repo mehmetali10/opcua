@@ -6,10 +6,14 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+// DiscoveryService implements the Discovery Service Set
+//
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4
 type DiscoveryService struct {
 	srv *Server
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
 func (s *DiscoveryService) FindServersRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -29,6 +33,7 @@ func (s *DiscoveryService) FindServersRequest(sc *uasc.SecureChannel, r ua.Reque
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.3
 func (s *DiscoveryService) FindServersOnNetworkRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -48,6 +53,7 @@ func (s *DiscoveryService) FindServersOnNetworkRequest(sc *uasc.SecureChannel, r
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.4
 func (s *DiscoveryService) GetEndpointsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -65,6 +71,7 @@ func (s *DiscoveryService) GetEndpointsRequest(sc *uasc.SecureChannel, r ua.Requ
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.5
 func (s *DiscoveryService) RegisterServerRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -84,6 +91,7 @@ func (s *DiscoveryService) RegisterServerRequest(sc *uasc.SecureChannel, r ua.Re
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.6
 func (s *DiscoveryService) RegisterServer2Request(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 

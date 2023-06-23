@@ -8,10 +8,14 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+// AttributeService implements the Attribute Service Set.
+//
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10
 type AttributeService struct {
 	srv *Server
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
 func (s *AttributeService) ReadRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -63,6 +67,7 @@ func (s *AttributeService) ReadRequest(sc *uasc.SecureChannel, r ua.Request) (ua
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.3
 func (s *AttributeService) HistoryReadRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -82,6 +87,7 @@ func (s *AttributeService) HistoryReadRequest(sc *uasc.SecureChannel, r ua.Reque
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
 func (s *AttributeService) WriteRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -101,6 +107,7 @@ func (s *AttributeService) WriteRequest(sc *uasc.SecureChannel, r ua.Request) (u
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
 func (s *AttributeService) HistoryUpdateRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 

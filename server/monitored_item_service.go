@@ -6,29 +6,14 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+// MonitoredItemService implements the MonitoredItem Service Set.
+//
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12
 type MonitoredItemService struct {
 	srv *Server
 }
 
-func (s *MonitoredItemService) MonitoredItemCreateRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
-
-	//req, ok := r.(*ua.MonitoredItemCreateRequest)
-	//if !ok {
-	//	debug.Printf("handleMonitoredItemCreateRequest: Expected *ua.MonitoredItemCreateRequest, got %T", r)
-	//	return nil, ua.StatusBadRequestTypeInvalid
-	//}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(0, ua.StatusBadServiceUnsupported)}
-	// response := &ua.MonitoredItemCreateResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
-}
-
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
 func (s *MonitoredItemService) CreateMonitoredItemsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -48,25 +33,7 @@ func (s *MonitoredItemService) CreateMonitoredItemsRequest(sc *uasc.SecureChanne
 	return response, nil
 }
 
-func (s *MonitoredItemService) MonitoredItemModifyRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
-
-	//req, ok := r.(*ua.MonitoredItemModifyRequest)
-	//if !ok {
-	//	debug.Printf("handleMonitoredItemModifyRequest: Expected *ua.MonitoredItemModifyRequest, got %T", r)
-	//	return nil, ua.StatusBadRequestTypeInvalid
-	//}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(0, ua.StatusBadServiceUnsupported)}
-	// response := &ua.MonitoredItemModifyResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
-}
-
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.3
 func (s *MonitoredItemService) ModifyMonitoredItemsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -86,6 +53,7 @@ func (s *MonitoredItemService) ModifyMonitoredItemsRequest(sc *uasc.SecureChanne
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.4
 func (s *MonitoredItemService) SetMonitoringModeRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -105,6 +73,7 @@ func (s *MonitoredItemService) SetMonitoringModeRequest(sc *uasc.SecureChannel, 
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.5
 func (s *MonitoredItemService) SetTriggeringRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -124,6 +93,7 @@ func (s *MonitoredItemService) SetTriggeringRequest(sc *uasc.SecureChannel, r ua
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
 func (s *MonitoredItemService) DeleteMonitoredItemsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 

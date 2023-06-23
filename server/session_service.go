@@ -18,10 +18,14 @@ const (
 	sessionNonceLength = 32
 )
 
+// SessionService implements the Session Service Set.
+//
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6
 type SessionService struct {
 	srv *Server
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.2
 func (s *SessionService) CreateSessionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -72,6 +76,7 @@ func (s *SessionService) CreateSessionRequest(sc *uasc.SecureChannel, r ua.Reque
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.3
 func (s *SessionService) ActivateSessionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -109,6 +114,7 @@ func (s *SessionService) ActivateSessionRequest(sc *uasc.SecureChannel, r ua.Req
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.4
 func (s *SessionService) CloseSessionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -131,6 +137,7 @@ func (s *SessionService) CloseSessionRequest(sc *uasc.SecureChannel, r ua.Reques
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.5
 func (s *SessionService) CancelRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 

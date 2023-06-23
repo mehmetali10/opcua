@@ -60,13 +60,13 @@ func (s *Server) initHandlers() {
 	s.registerHandler(id.HistoryUpdateRequest_Encoding_DefaultBinary, attr.HistoryUpdateRequest)
 
 	method := &MethodService{s}
-	s.registerHandler(id.CallMethodRequest_Encoding_DefaultBinary, method.CallMethodRequest)
+	// s.registerHandler(id.CallMethodRequest_Encoding_DefaultBinary, method.CallMethodRequest) // todo(fs): I think this is bogus
 	s.registerHandler(id.CallRequest_Encoding_DefaultBinary, method.CallRequest)
 
 	item := &MonitoredItemService{s}
-	s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreateRequest)
+	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreateRequest)
 	s.registerHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, item.CreateMonitoredItemsRequest)
-	s.registerHandler(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, item.MonitoredItemModifyRequest)
+	// s.registerHandler(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, item.MonitoredItemModifyRequest)
 	s.registerHandler(id.ModifyMonitoredItemsRequest_Encoding_DefaultBinary, item.ModifyMonitoredItemsRequest)
 	s.registerHandler(id.SetMonitoringModeRequest_Encoding_DefaultBinary, item.SetMonitoringModeRequest)
 	s.registerHandler(id.SetTriggeringRequest_Encoding_DefaultBinary, item.SetTriggeringRequest)

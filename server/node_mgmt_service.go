@@ -6,10 +6,14 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+// NodeManagementService implements the Node Management Service Set.
+//
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7
 type NodeManagementService struct {
 	srv *Server
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.2
 func (s *NodeManagementService) AddNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -29,6 +33,7 @@ func (s *NodeManagementService) AddNodesRequest(sc *uasc.SecureChannel, r ua.Req
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.3
 func (s *NodeManagementService) AddReferencesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -48,6 +53,7 @@ func (s *NodeManagementService) AddReferencesRequest(sc *uasc.SecureChannel, r u
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.4
 func (s *NodeManagementService) DeleteNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -67,6 +73,7 @@ func (s *NodeManagementService) DeleteNodesRequest(sc *uasc.SecureChannel, r ua.
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.5
 func (s *NodeManagementService) DeleteReferencesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 

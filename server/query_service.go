@@ -6,10 +6,14 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+// QueryService implements the Query Service Set.
+//
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9
 type QueryService struct {
 	srv *Server
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.3
 func (s *QueryService) QueryFirstRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
@@ -29,6 +33,7 @@ func (s *QueryService) QueryFirstRequest(sc *uasc.SecureChannel, r ua.Request) (
 	return response, nil
 }
 
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.4
 func (s *QueryService) QueryNextRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
