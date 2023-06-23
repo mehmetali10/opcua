@@ -26,7 +26,7 @@ type SessionService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.2
-func (s *SessionService) CreateSessionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.CreateSessionRequest)
@@ -77,7 +77,7 @@ func (s *SessionService) CreateSessionRequest(sc *uasc.SecureChannel, r ua.Reque
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.3
-func (s *SessionService) ActivateSessionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.ActivateSessionRequest)
@@ -115,7 +115,7 @@ func (s *SessionService) ActivateSessionRequest(sc *uasc.SecureChannel, r ua.Req
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.4
-func (s *SessionService) CloseSessionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SessionService) CloseSession(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.CloseSessionRequest)
@@ -138,7 +138,7 @@ func (s *SessionService) CloseSessionRequest(sc *uasc.SecureChannel, r ua.Reques
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.5
-func (s *SessionService) CancelRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SessionService) Cancel(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.CancelRequest)

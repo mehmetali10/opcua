@@ -14,7 +14,7 @@ type QueryService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.3
-func (s *QueryService) QueryFirstRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *QueryService) QueryFirst(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.QueryFirstRequest)
@@ -34,7 +34,7 @@ func (s *QueryService) QueryFirstRequest(sc *uasc.SecureChannel, r ua.Request) (
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.4
-func (s *QueryService) QueryNextRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *QueryService) QueryNext(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.QueryNextRequest)

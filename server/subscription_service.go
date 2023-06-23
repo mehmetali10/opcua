@@ -14,7 +14,7 @@ type SubscriptionService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
-func (s *SubscriptionService) CreateSubscriptionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.CreateSubscriptionRequest)
@@ -34,7 +34,7 @@ func (s *SubscriptionService) CreateSubscriptionRequest(sc *uasc.SecureChannel, 
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.3
-func (s *SubscriptionService) ModifySubscriptionRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.ModifySubscriptionRequest)
@@ -54,7 +54,7 @@ func (s *SubscriptionService) ModifySubscriptionRequest(sc *uasc.SecureChannel, 
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.4
-func (s *SubscriptionService) SetPublishingModeRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.SetPublishingModeRequest)
@@ -74,7 +74,7 @@ func (s *SubscriptionService) SetPublishingModeRequest(sc *uasc.SecureChannel, r
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.5
-func (s *SubscriptionService) PublishRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.PublishRequest)
@@ -94,7 +94,7 @@ func (s *SubscriptionService) PublishRequest(sc *uasc.SecureChannel, r ua.Reques
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.6
-func (s *SubscriptionService) RepublishRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SubscriptionService) Republish(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.RepublishRequest)
@@ -114,7 +114,7 @@ func (s *SubscriptionService) RepublishRequest(sc *uasc.SecureChannel, r ua.Requ
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.7
-func (s *SubscriptionService) TransferSubscriptionsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SubscriptionService) TransferSubscriptions(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.TransferSubscriptionsRequest)
@@ -134,7 +134,7 @@ func (s *SubscriptionService) TransferSubscriptionsRequest(sc *uasc.SecureChanne
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.8
-func (s *SubscriptionService) DeleteSubscriptionsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.DeleteSubscriptionsRequest)

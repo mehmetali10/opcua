@@ -14,7 +14,7 @@ type MethodService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.11.2
-func (s *MethodService) CallRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MethodService) Call(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.CallRequest)

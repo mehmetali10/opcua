@@ -20,66 +20,66 @@ func (s *Server) initHandlers() {
 	// s.registerHandlerFunc(id.ServiceFault_Encoding_DefaultBinary, handleServiceFault)
 
 	discovery := &DiscoveryService{s}
-	s.registerHandler(id.FindServersRequest_Encoding_DefaultBinary, discovery.FindServersRequest)
-	s.registerHandler(id.FindServersOnNetworkRequest_Encoding_DefaultBinary, discovery.FindServersOnNetworkRequest)
-	s.registerHandler(id.GetEndpointsRequest_Encoding_DefaultBinary, discovery.GetEndpointsRequest)
-	s.registerHandler(id.RegisterServerRequest_Encoding_DefaultBinary, discovery.RegisterServerRequest)
-	s.registerHandler(id.RegisterServer2Request_Encoding_DefaultBinary, discovery.RegisterServer2Request)
+	s.registerHandler(id.FindServersRequest_Encoding_DefaultBinary, discovery.FindServers)
+	s.registerHandler(id.FindServersOnNetworkRequest_Encoding_DefaultBinary, discovery.FindServersOnNetwork)
+	s.registerHandler(id.GetEndpointsRequest_Encoding_DefaultBinary, discovery.GetEndpoints)
+	s.registerHandler(id.RegisterServerRequest_Encoding_DefaultBinary, discovery.RegisterServer)
+	s.registerHandler(id.RegisterServer2Request_Encoding_DefaultBinary, discovery.RegisterServer2)
 
 	// SecureChannel service (handled in the uasc stack)
-	// s.registerHandlerFunc(id.OpenSecureChannelRequest_Encoding_DefaultBinary, handleOpenSecureChannelRequest)
-	// s.registerHandlerFunc(id.CloseSecureChannelRequest_Encoding_DefaultBinary, handleCloseSecureChannelRequest)
+	// s.registerHandlerFunc(id.OpenSecureChannelRequest_Encoding_DefaultBinary, handleOpenSecureChannel)
+	// s.registerHandlerFunc(id.CloseSecureChannelRequest_Encoding_DefaultBinary, handleCloseSecureChannel)
 
 	session := &SessionService{s}
-	s.registerHandler(id.CreateSessionRequest_Encoding_DefaultBinary, session.CreateSessionRequest)
-	s.registerHandler(id.ActivateSessionRequest_Encoding_DefaultBinary, session.ActivateSessionRequest)
-	s.registerHandler(id.CloseSessionRequest_Encoding_DefaultBinary, session.CloseSessionRequest)
-	s.registerHandler(id.CancelRequest_Encoding_DefaultBinary, session.CancelRequest)
+	s.registerHandler(id.CreateSessionRequest_Encoding_DefaultBinary, session.CreateSession)
+	s.registerHandler(id.ActivateSessionRequest_Encoding_DefaultBinary, session.ActivateSession)
+	s.registerHandler(id.CloseSessionRequest_Encoding_DefaultBinary, session.CloseSession)
+	s.registerHandler(id.CancelRequest_Encoding_DefaultBinary, session.Cancel)
 
 	node := &NodeManagementService{s}
-	s.registerHandler(id.AddNodesRequest_Encoding_DefaultBinary, node.AddNodesRequest)
-	s.registerHandler(id.AddReferencesRequest_Encoding_DefaultBinary, node.AddReferencesRequest)
-	s.registerHandler(id.DeleteNodesRequest_Encoding_DefaultBinary, node.DeleteNodesRequest)
-	s.registerHandler(id.DeleteReferencesRequest_Encoding_DefaultBinary, node.DeleteReferencesRequest)
+	s.registerHandler(id.AddNodesRequest_Encoding_DefaultBinary, node.AddNodes)
+	s.registerHandler(id.AddReferencesRequest_Encoding_DefaultBinary, node.AddReferences)
+	s.registerHandler(id.DeleteNodesRequest_Encoding_DefaultBinary, node.DeleteNodes)
+	s.registerHandler(id.DeleteReferencesRequest_Encoding_DefaultBinary, node.DeleteReferences)
 
 	view := &ViewService{s}
-	s.registerHandler(id.BrowseRequest_Encoding_DefaultBinary, view.BrowseRequest)
-	s.registerHandler(id.BrowseNextRequest_Encoding_DefaultBinary, view.BrowseNextRequest)
-	s.registerHandler(id.TranslateBrowsePathsToNodeIDsRequest_Encoding_DefaultBinary, view.TranslateBrowsePathsToNodeIDsRequest)
-	s.registerHandler(id.RegisterNodesRequest_Encoding_DefaultBinary, view.RegisterNodesRequest)
-	s.registerHandler(id.UnregisterNodesRequest_Encoding_DefaultBinary, view.UnregisterNodesRequest)
+	s.registerHandler(id.BrowseRequest_Encoding_DefaultBinary, view.Browse)
+	s.registerHandler(id.BrowseNextRequest_Encoding_DefaultBinary, view.BrowseNext)
+	s.registerHandler(id.TranslateBrowsePathsToNodeIDsRequest_Encoding_DefaultBinary, view.TranslateBrowsePathsToNodeIDs)
+	s.registerHandler(id.RegisterNodesRequest_Encoding_DefaultBinary, view.RegisterNodes)
+	s.registerHandler(id.UnregisterNodesRequest_Encoding_DefaultBinary, view.UnregisterNodes)
 
 	query := &QueryService{s}
-	s.registerHandler(id.QueryFirstRequest_Encoding_DefaultBinary, query.QueryFirstRequest)
-	s.registerHandler(id.QueryNextRequest_Encoding_DefaultBinary, query.QueryNextRequest)
+	s.registerHandler(id.QueryFirstRequest_Encoding_DefaultBinary, query.QueryFirst)
+	s.registerHandler(id.QueryNextRequest_Encoding_DefaultBinary, query.QueryNext)
 
 	attr := &AttributeService{s}
-	s.registerHandler(id.ReadRequest_Encoding_DefaultBinary, attr.ReadRequest)
-	s.registerHandler(id.HistoryReadRequest_Encoding_DefaultBinary, attr.HistoryReadRequest)
-	s.registerHandler(id.WriteRequest_Encoding_DefaultBinary, attr.WriteRequest)
-	s.registerHandler(id.HistoryUpdateRequest_Encoding_DefaultBinary, attr.HistoryUpdateRequest)
+	s.registerHandler(id.ReadRequest_Encoding_DefaultBinary, attr.Read)
+	s.registerHandler(id.HistoryReadRequest_Encoding_DefaultBinary, attr.HistoryRead)
+	s.registerHandler(id.WriteRequest_Encoding_DefaultBinary, attr.Write)
+	s.registerHandler(id.HistoryUpdateRequest_Encoding_DefaultBinary, attr.HistoryUpdate)
 
 	method := &MethodService{s}
-	// s.registerHandler(id.CallMethodRequest_Encoding_DefaultBinary, method.CallMethodRequest) // todo(fs): I think this is bogus
-	s.registerHandler(id.CallRequest_Encoding_DefaultBinary, method.CallRequest)
+	// s.registerHandler(id.CallMethodRequest_Encoding_DefaultBinary, method.CallMethod) // todo(fs): I think this is bogus
+	s.registerHandler(id.CallRequest_Encoding_DefaultBinary, method.Call)
 
 	item := &MonitoredItemService{s}
-	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreateRequest)
-	s.registerHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, item.CreateMonitoredItemsRequest)
-	// s.registerHandler(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, item.MonitoredItemModifyRequest)
-	s.registerHandler(id.ModifyMonitoredItemsRequest_Encoding_DefaultBinary, item.ModifyMonitoredItemsRequest)
-	s.registerHandler(id.SetMonitoringModeRequest_Encoding_DefaultBinary, item.SetMonitoringModeRequest)
-	s.registerHandler(id.SetTriggeringRequest_Encoding_DefaultBinary, item.SetTriggeringRequest)
-	s.registerHandler(id.DeleteMonitoredItemsRequest_Encoding_DefaultBinary, item.DeleteMonitoredItemsRequest)
+	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreate)
+	s.registerHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, item.CreateMonitoredItems)
+	// s.registerHandler(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, item.MonitoredItemModify)
+	s.registerHandler(id.ModifyMonitoredItemsRequest_Encoding_DefaultBinary, item.ModifyMonitoredItems)
+	s.registerHandler(id.SetMonitoringModeRequest_Encoding_DefaultBinary, item.SetMonitoringMode)
+	s.registerHandler(id.SetTriggeringRequest_Encoding_DefaultBinary, item.SetTriggering)
+	s.registerHandler(id.DeleteMonitoredItemsRequest_Encoding_DefaultBinary, item.DeleteMonitoredItems)
 
 	sub := &SubscriptionService{s}
-	s.registerHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscriptionRequest)
-	s.registerHandler(id.ModifySubscriptionRequest_Encoding_DefaultBinary, sub.ModifySubscriptionRequest)
-	s.registerHandler(id.SetPublishingModeRequest_Encoding_DefaultBinary, sub.SetPublishingModeRequest)
-	s.registerHandler(id.PublishRequest_Encoding_DefaultBinary, sub.PublishRequest)
-	s.registerHandler(id.RepublishRequest_Encoding_DefaultBinary, sub.RepublishRequest)
-	s.registerHandler(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, sub.TransferSubscriptionsRequest)
-	s.registerHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, sub.DeleteSubscriptionsRequest)
+	s.registerHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)
+	s.registerHandler(id.ModifySubscriptionRequest_Encoding_DefaultBinary, sub.ModifySubscription)
+	s.registerHandler(id.SetPublishingModeRequest_Encoding_DefaultBinary, sub.SetPublishingMode)
+	s.registerHandler(id.PublishRequest_Encoding_DefaultBinary, sub.Publish)
+	s.registerHandler(id.RepublishRequest_Encoding_DefaultBinary, sub.Republish)
+	s.registerHandler(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, sub.TransferSubscriptions)
+	s.registerHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, sub.DeleteSubscriptions)
 }
 
 func (s *Server) registerHandler(typeID uint16, h Handler) {

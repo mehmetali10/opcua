@@ -21,7 +21,7 @@ type ViewService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
-func (s *ViewService) BrowseRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.BrowseRequest)
@@ -127,7 +127,7 @@ func (s *ViewService) getSubRefs(nid *ua.NodeID) []*ua.NodeID {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.3
-func (s *ViewService) BrowseNextRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *ViewService) BrowseNext(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.BrowseNextRequest)
@@ -147,7 +147,7 @@ func (s *ViewService) BrowseNextRequest(sc *uasc.SecureChannel, r ua.Request) (u
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.4
-func (s *ViewService) TranslateBrowsePathsToNodeIDsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *ViewService) TranslateBrowsePathsToNodeIDs(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.TranslateBrowsePathsToNodeIDsRequest)
@@ -167,7 +167,7 @@ func (s *ViewService) TranslateBrowsePathsToNodeIDsRequest(sc *uasc.SecureChanne
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.5
-func (s *ViewService) RegisterNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *ViewService) RegisterNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.RegisterNodesRequest)
@@ -187,7 +187,7 @@ func (s *ViewService) RegisterNodesRequest(sc *uasc.SecureChannel, r ua.Request)
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.6
-func (s *ViewService) UnregisterNodesRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *ViewService) UnregisterNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.UnregisterNodesRequest)

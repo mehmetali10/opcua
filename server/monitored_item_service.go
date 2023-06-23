@@ -14,7 +14,7 @@ type MonitoredItemService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
-func (s *MonitoredItemService) CreateMonitoredItemsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.CreateMonitoredItemsRequest)
@@ -34,7 +34,7 @@ func (s *MonitoredItemService) CreateMonitoredItemsRequest(sc *uasc.SecureChanne
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.3
-func (s *MonitoredItemService) ModifyMonitoredItemsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MonitoredItemService) ModifyMonitoredItems(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.ModifyMonitoredItemsRequest)
@@ -54,7 +54,7 @@ func (s *MonitoredItemService) ModifyMonitoredItemsRequest(sc *uasc.SecureChanne
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.4
-func (s *MonitoredItemService) SetMonitoringModeRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.SetMonitoringModeRequest)
@@ -74,7 +74,7 @@ func (s *MonitoredItemService) SetMonitoringModeRequest(sc *uasc.SecureChannel, 
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.5
-func (s *MonitoredItemService) SetTriggeringRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MonitoredItemService) SetTriggering(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.SetTriggeringRequest)
@@ -94,7 +94,7 @@ func (s *MonitoredItemService) SetTriggeringRequest(sc *uasc.SecureChannel, r ua
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
-func (s *MonitoredItemService) DeleteMonitoredItemsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.DeleteMonitoredItemsRequest)

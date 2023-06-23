@@ -14,7 +14,7 @@ type DiscoveryService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
-func (s *DiscoveryService) FindServersRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.FindServersRequest)
@@ -34,7 +34,7 @@ func (s *DiscoveryService) FindServersRequest(sc *uasc.SecureChannel, r ua.Reque
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.3
-func (s *DiscoveryService) FindServersOnNetworkRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.FindServersOnNetworkRequest)
@@ -54,7 +54,7 @@ func (s *DiscoveryService) FindServersOnNetworkRequest(sc *uasc.SecureChannel, r
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.4
-func (s *DiscoveryService) GetEndpointsRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.GetEndpointsRequest)
@@ -72,7 +72,7 @@ func (s *DiscoveryService) GetEndpointsRequest(sc *uasc.SecureChannel, r ua.Requ
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.5
-func (s *DiscoveryService) RegisterServerRequest(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.RegisterServerRequest)
@@ -92,7 +92,7 @@ func (s *DiscoveryService) RegisterServerRequest(sc *uasc.SecureChannel, r ua.Re
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.6
-func (s *DiscoveryService) RegisterServer2Request(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) RegisterServer2(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
 	debug.Printf("Handling %T\n", r)
 
 	req, ok := r.(*ua.RegisterServer2Request)
