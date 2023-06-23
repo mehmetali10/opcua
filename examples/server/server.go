@@ -71,8 +71,8 @@ func main() {
 	}
 
 	s := server.New(*endpoint, opts...)
-	obj, _ := s.AddressSpace().Objects()
-	obj.AddVariable(server.NewNode(
+	objects := s.AddressSpace().Objects()
+	objects.AddVariable(server.NewNode(
 		ua.NewNumericNodeID(0, 9999),
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("MyValueNode")),

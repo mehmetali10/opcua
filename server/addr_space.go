@@ -48,30 +48,30 @@ func (as *AddressSpace) AddNode(n *Node) *Node {
 }
 
 func (as *AddressSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
-	n, err := as.Node(id)
-	if err != ua.StatusGood {
-		return nil, err
+	n := as.Node(id)
+	if n == nil {
+		return nil, ua.StatusBadNodeIDUnknown
 	}
 	return n.Attribute(attr)
 }
 
-func (as *AddressSpace) Node(id *ua.NodeID) (*Node, error) {
+func (as *AddressSpace) Node(id *ua.NodeID) *Node {
 	as.mu.Lock()
 	defer as.mu.Unlock()
 	if id == nil {
-		return nil, ua.StatusBadNodeIDUnknown
+		return nil
 	}
 	n := as.m[id.String()]
 	if n == nil {
-		return nil, ua.StatusBadNodeIDUnknown
+		return nil
 	}
-	return n, ua.StatusGood
+	return n
 }
 
-func (as *AddressSpace) Objects() (*Node, error) {
+func (as *AddressSpace) Objects() *Node {
 	return as.Node(ObjectsFolder)
 }
 
-func (as *AddressSpace) Root() (*Node, error) {
+func (as *AddressSpace) Root() *Node {
 	return as.Node(RootFolder)
 }
