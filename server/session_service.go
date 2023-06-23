@@ -27,12 +27,11 @@ type SessionService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.2
 func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.CreateSessionRequest)
-	if !ok {
-		debug.Printf("handleCreateSessionRequest: Expected *ua.CreateSessionRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.CreateSessionRequest](r)
+	if err != nil {
+		return nil, err
 	}
 
 	// New session
@@ -78,12 +77,11 @@ func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request) (ua
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.3
 func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.ActivateSessionRequest)
-	if !ok {
-		debug.Printf("handleActivateSessionRequest: Expected *ua.ActivateSessionRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.ActivateSessionRequest](r)
+	if err != nil {
+		return nil, err
 	}
 
 	sess := s.srv.sb.Session(req.RequestHeader.AuthenticationToken)
@@ -91,7 +89,7 @@ func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request) (
 		return nil, ua.StatusBadSessionIDInvalid
 	}
 
-	err := sc.VerifySessionSignature(sess.remoteCertificate, sess.serverNonce, req.ClientSignature.Signature)
+	err = sc.VerifySessionSignature(sess.remoteCertificate, sess.serverNonce, req.ClientSignature.Signature)
 	if err != nil {
 		debug.Printf("error verifying session signature with nonce: %s", err)
 		return nil, ua.StatusBadSecurityChecksFailed
@@ -116,15 +114,14 @@ func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request) (
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.4
 func (s *SessionService) CloseSession(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.CloseSessionRequest)
-	if !ok {
-		debug.Printf("handleCloseSessionRequest: Expected *ua.CloseSessionRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.CloseSessionRequest](r)
+	if err != nil {
+		return nil, err
 	}
 
-	err := s.srv.sb.Close(req.RequestHeader.AuthenticationToken)
+	err = s.srv.sb.Close(req.RequestHeader.AuthenticationToken)
 	if err != nil {
 		return nil, ua.StatusBadSessionIDInvalid
 	}
@@ -139,20 +136,11 @@ func (s *SessionService) CloseSession(sc *uasc.SecureChannel, r ua.Request) (ua.
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.5
 func (s *SessionService) Cancel(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.CancelRequest)
-	if !ok {
-		debug.Printf("handleCancelRequest: Expected *ua.CancelRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.CancelRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.CancelResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }

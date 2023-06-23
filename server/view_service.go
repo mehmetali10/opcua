@@ -22,12 +22,11 @@ type ViewService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
 func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.BrowseRequest)
-	if !ok {
-		debug.Printf("BrowseRequest: Expected *ua.BrowseRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.BrowseRequest](r)
+	if err != nil {
+		return nil, err
 	}
 
 	resp := &ua.BrowseResponse{
@@ -128,80 +127,44 @@ func (s *ViewService) getSubRefs(nid *ua.NodeID) []*ua.NodeID {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.3
 func (s *ViewService) BrowseNext(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.BrowseNextRequest)
-	if !ok {
-		debug.Printf("BrowseNextRequest: Expected *ua.BrowseNextRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.BrowseNextRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.BrowseNextResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.4
 func (s *ViewService) TranslateBrowsePathsToNodeIDs(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.TranslateBrowsePathsToNodeIDsRequest)
-	if !ok {
-		debug.Printf("TranslateBrowsePathsToNodeIDsRequest: Expected *ua.TranslateBrowsePathsToNodeIDsRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.TranslateBrowsePathsToNodeIDsRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.TranslateBrowsePathsToNodeIDsResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.5
 func (s *ViewService) RegisterNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.RegisterNodesRequest)
-	if !ok {
-		debug.Printf("RegisterNodesRequest: Expected *ua.RegisterNodesRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.RegisterNodesRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.RegisterNodesResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.6
 func (s *ViewService) UnregisterNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.UnregisterNodesRequest)
-	if !ok {
-		debug.Printf("UnregisterNodesRequest: Expected *ua.UnregisterNodesRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.UnregisterNodesRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.UnregisterNodesResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }

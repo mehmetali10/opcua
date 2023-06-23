@@ -17,12 +17,11 @@ type AttributeService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
 func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.ReadRequest)
-	if !ok {
-		debug.Printf("handleReadRequest: Expected *ua.ReadRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.ReadRequest](r)
+	if err != nil {
+		return nil, err
 	}
 
 	results := make([]*ua.DataValue, len(req.NodesToRead))
@@ -69,60 +68,33 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request) (ua.Respon
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.3
 func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.HistoryReadRequest)
-	if !ok {
-		debug.Printf("handleHistoryReadRequest: Expected *ua.HistoryReadRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.HistoryReadRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.HistoryReadResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
 func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.WriteRequest)
-	if !ok {
-		debug.Printf("handleWriteRequest: Expected *ua.WriteRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.WriteRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.WriteResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
 func (s *AttributeService) HistoryUpdate(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.HistoryUpdateRequest)
-	if !ok {
-		debug.Printf("handleHistoryUpdateRequest: Expected *ua.HistoryUpdateRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.HistoryUpdateRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.HistoryUpdateResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }

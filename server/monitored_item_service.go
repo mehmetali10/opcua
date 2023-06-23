@@ -15,100 +15,55 @@ type MonitoredItemService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
 func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.CreateMonitoredItemsRequest)
-	if !ok {
-		debug.Printf("handleCreateMonitoredItemsRequest: Expected *ua.CreateMonitoredItemsRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.CreateMonitoredItemsResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.3
 func (s *MonitoredItemService) ModifyMonitoredItems(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.ModifyMonitoredItemsRequest)
-	if !ok {
-		debug.Printf("handleModifyMonitoredItemsRequest: Expected *ua.ModifyMonitoredItemsRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.ModifyMonitoredItemsRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.ModifyMonitoredItemsResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.4
 func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.SetMonitoringModeRequest)
-	if !ok {
-		debug.Printf("handleSetMonitoringModeRequest: Expected *ua.SetMonitoringModeRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.SetMonitoringModeRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.SetMonitoringModeResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.5
 func (s *MonitoredItemService) SetTriggering(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.SetTriggeringRequest)
-	if !ok {
-		debug.Printf("handleSetTriggeringRequest: Expected *ua.SetTriggeringRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.SetTriggeringRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.SetTriggeringResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
 func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.DeleteMonitoredItemsRequest)
-	if !ok {
-		debug.Printf("handleDeleteMonitoredItemsRequest: Expected *ua.DeleteMonitoredItemsRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.DeleteMonitoredItemsRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.DeleteMonitoredItemsResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }

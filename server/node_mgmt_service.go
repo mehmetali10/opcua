@@ -15,80 +15,44 @@ type NodeManagementService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.2
 func (s *NodeManagementService) AddNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.AddNodesRequest)
-	if !ok {
-		debug.Printf("handleAddNodesRequest: Expected *ua.AddNodesRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.AddNodesRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.AddNodesResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.3
 func (s *NodeManagementService) AddReferences(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.AddReferencesRequest)
-	if !ok {
-		debug.Printf("handleAddReferencesRequest: Expected *ua.AddReferencesRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.AddReferencesRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.AddReferencesResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.4
 func (s *NodeManagementService) DeleteNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.DeleteNodesRequest)
-	if !ok {
-		debug.Printf("handleDeleteNodesRequest: Expected *ua.DeleteNodesRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.DeleteNodesRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.DeleteNodesResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.5
 func (s *NodeManagementService) DeleteReferences(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.DeleteReferencesRequest)
-	if !ok {
-		debug.Printf("handleDeleteReferencesRequest: Expected *ua.DeleteReferencesRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.DeleteReferencesRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.DeleteReferencesResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }

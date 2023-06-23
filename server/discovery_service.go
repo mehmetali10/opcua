@@ -15,12 +15,11 @@ type DiscoveryService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
 func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.FindServersRequest)
-	if !ok {
-		debug.Printf("handleFindServersRequest: Expected *ua.FindServersRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.FindServersRequest](r)
+	if err != nil {
+		return nil, err
 	}
 
 	response := &ua.FindServersResponse{
@@ -35,32 +34,22 @@ func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request) (ua
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.3
 func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.FindServersOnNetworkRequest)
-	if !ok {
-		debug.Printf("handleFindServersOnNetworkRequest: Expected *ua.FindServersOnNetworkRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.FindServersOnNetworkRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.FindServersOnNetworkResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.4
 func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.GetEndpointsRequest)
-	if !ok {
-		debug.Printf("handleGetEndpointsRequest: Expected *ua.GetEndpointsRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.GetEndpointsRequest](r)
+	if err != nil {
+		return nil, err
 	}
 
 	response := &ua.GetEndpointsResponse{
@@ -73,40 +62,22 @@ func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request) (u
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.5
 func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.RegisterServerRequest)
-	if !ok {
-		debug.Printf("handleRegisterServerRequest: Expected *ua.RegisterServerRequest, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.RegisterServerRequest](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.RegisterServerResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.6
 func (s *DiscoveryService) RegisterServer2(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-	debug.Printf("Handling %T\n", r)
+	debug.Printf("Handling %T", r)
 
-	req, ok := r.(*ua.RegisterServer2Request)
-	if !ok {
-		debug.Printf("handleRegisterServer2Request: Expected *ua.RegisterServer2Request, got %T", r)
-		return nil, ua.StatusBadRequestTypeInvalid
+	req, err := safeReq[*ua.RegisterServer2Request](r)
+	if err != nil {
+		return nil, err
 	}
-
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.RegisterServer2Response{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
-
-	return response, nil
+	return serviceUnsupported(req.RequestHeader), nil
 }

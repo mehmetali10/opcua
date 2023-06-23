@@ -132,8 +132,24 @@ func responseHeader(reqID uint32, statusCode ua.StatusCode) *ua.ResponseHeader {
 	}
 }
 
+func serviceUnsupported(hdr *ua.RequestHeader) ua.Response {
+	return &ua.ServiceFault{
+		ResponseHeader: responseHeader(hdr.RequestHandle, ua.StatusBadServiceUnsupported),
+	}
+}
+
+func safeReq[T ua.Request](r ua.Request) (T, error) {
+	var t T
+	req, ok := r.(T)
+	if !ok {
+		debug.Printf("expected %T, got %T", t, r)
+		return t, ua.StatusBadRequestTypeInvalid
+	}
+	return req, nil
+}
+
 // func handleServiceFault(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
-// 	debug.Printf("Handling %T\n", r)
+// 	debug.Printf("Handling %T", r)
 
 // 	req, ok := r.(*ua.ServiceFault)
 // 	if !ok {
