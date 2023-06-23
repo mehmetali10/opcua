@@ -36,14 +36,13 @@ type channelBroker struct {
 }
 
 func newChannelBroker() *channelBroker {
-	mrand.Seed(time.Now().UnixNano())
-
+	rng := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 	return &channelBroker{
 		endpoints:       make(map[string]*ua.EndpointDescription),
 		s:               make(map[uint32]*uasc.SecureChannel),
 		msgChan:         make(chan *uasc.MessageBody),
-		secureChannelID: uint32(mrand.Int31()),
-		secureTokenID:   uint32(mrand.Int31()),
+		secureChannelID: uint32(rng.Int31()),
+		secureTokenID:   uint32(rng.Int31()),
 	}
 }
 
