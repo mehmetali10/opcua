@@ -117,7 +117,7 @@ func (s *ViewService) getSubRefs(nid *ua.NodeID) []*ua.NodeID {
 		return nil
 	}
 	for _, ref := range node.refs {
-		if ref.ReferenceTypeID.Equal(hasSubtype) && ref.IsForward {
+		if ref.ReferenceTypeID.Equal(hasSubtype) && ref.IsForward && ref.NodeID != nil {
 			refs = append(refs, ref.NodeID.NodeID)
 			refs = append(refs, s.getSubRefs(ref.NodeID.NodeID)...)
 		}
