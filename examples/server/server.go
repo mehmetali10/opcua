@@ -12,8 +12,10 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
@@ -27,7 +29,7 @@ var (
 )
 
 func main() {
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+	flag.BoolVar(&debug.Enable, "debug", true, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
 
@@ -70,16 +72,49 @@ func main() {
 		}
 	}
 
-	s := server.New(*endpoint, opts...)
-	objects := s.AddressSpace().Objects()
-	objects.AddVariable(server.NewNode(
-		ua.NewNumericNodeID(0, 9999),
+	n1 := server.NewNode(
+		ua.NewStringNodeID(0, "MyValueNode"),
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("MyValueNode")),
+			ua.AttributeIDValue:      ua.MustVariant(123.45),
 		},
 		nil,
 		func() *ua.Variant { return ua.MustVariant("MyValue") },
+	)
+
+	s := server.New(*endpoint, opts...)
+	objects := s.AddressSpace().Objects()
+	objects.AddObject(n1)
+	objects.AddObject(server.NewNode(
+		ua.NewNumericNodeID(0, 2259),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Dunno")),
+			ua.AttributeIDValue:      ua.MustVariant(123.45),
+		},
+		nil,
+		func() *ua.Variant { return ua.MustVariant("Dunno") },
 	))
+
+	s.AddressSpace().AddNode(server.NewNode(
+		ua.NewStringNodeID(0, "TestNodeName"),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("TestNodeName")),
+		},
+		nil,
+		func() *ua.Variant { return ua.MustVariant("TestValue") },
+	))
+
+	mrw := MapReadWriter{}
+	mrw.Data = make(map[string]any)
+	mrw.Data["s=Tag1"] = 123.4
+	mrw.Data["s=Tag2"] = 42
+	mrw.Data["s=Tag3.Tag4"] = "some string"
+	mrw.Data["s=Tag5"] = true
+	mrw.Data["s=Tag6"] = time.Now()
+
+	// register our custom read handler.
+	s.RegisterHandler(id.ReadRequest_Encoding_DefaultBinary, mrw.CustomRead)
+	s.RegisterHandler(id.WriteRequest_Encoding_DefaultBinary, mrw.CustomWrite)
 
 	if err := s.Start(context.Background()); err != nil {
 		log.Fatalf("Error starting server, exiting: %s", err)

@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"io"
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -331,6 +332,11 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 
 			hdr := chunk.Header
 			reqID := chunk.SequenceHeader.RequestID
+
+			strdat := string(chunk.Data)
+			if strings.Contains(strdat, "CurrentTime") {
+				debug.Printf("Requested CurrentTime.")
+			}
 
 			msg := &MessageBody{
 				RequestID:       reqID,

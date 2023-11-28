@@ -67,6 +67,7 @@ func (s *ViewService) suitableRef(desc *ua.BrowseDescription, ref *ua.ReferenceD
 		debug.Printf("%v not suitable because of direction", ref)
 		return false
 	}
+	return true
 	if !s.suitableRefType(desc.ReferenceTypeID, ref.ReferenceTypeID, desc.IncludeSubtypes) {
 		debug.Printf("%v not suitable because of ref type", ref)
 		return false

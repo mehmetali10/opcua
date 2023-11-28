@@ -43,7 +43,8 @@ func (as *AddressSpace) AddNode(n *Node) *Node {
 
 	// todo(fs): this is wrong since this leaves the old node in the list.
 	as.nodes = append(as.nodes, nn)
-	as.m[nn.ID().String()] = nn
+	k := nn.ID().String()
+	as.m[k] = nn
 	return nn
 }
 
@@ -61,7 +62,8 @@ func (as *AddressSpace) Node(id *ua.NodeID) *Node {
 	if id == nil {
 		return nil
 	}
-	n := as.m[id.String()]
+	k := id.String()
+	n := as.m[k]
 	if n == nil {
 		return nil
 	}

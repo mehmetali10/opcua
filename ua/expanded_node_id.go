@@ -104,6 +104,9 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 
 func (e *ExpandedNodeID) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
+	if e == nil {
+		return []byte{}, errors.New("e was nil")
+	}
 	buf.WriteStruct(e.NodeID)
 	if e.HasNamespaceURI() {
 		buf.WriteString(e.NamespaceURI)
