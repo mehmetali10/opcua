@@ -106,15 +106,16 @@ func main() {
 
 	mrw := MapReadWriter{}
 	mrw.Data = make(map[string]any)
-	mrw.Data["s=Tag1"] = 123.4
-	mrw.Data["s=Tag2"] = 42
-	mrw.Data["s=Tag3.Tag4"] = "some string"
-	mrw.Data["s=Tag5"] = true
-	mrw.Data["s=Tag6"] = time.Now()
+	mrw.Data["Tag1"] = 123.4
+	mrw.Data["Tag2"] = 42
+	mrw.Data["Tag3.Tag4"] = "some string"
+	mrw.Data["Tag5"] = true
+	mrw.Data["Tag6"] = time.Now()
 
 	// register our custom read handler.
 	s.RegisterHandler(id.ReadRequest_Encoding_DefaultBinary, mrw.CustomRead)
 	s.RegisterHandler(id.WriteRequest_Encoding_DefaultBinary, mrw.CustomWrite)
+	s.RegisterHandler(id.BrowseRequest_Encoding_DefaultBinary, mrw.CustomBrowse)
 
 	if err := s.Start(context.Background()); err != nil {
 		log.Fatalf("Error starting server, exiting: %s", err)

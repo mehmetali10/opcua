@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -9,6 +11,7 @@ import (
 )
 
 type MapReadWriter struct {
+	Mu   sync.RWMutex
 	Data map[string]any
 }
 
@@ -19,6 +22,8 @@ func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request) (ua.Res
 	if err != nil {
 		return nil, err
 	}
+	s.Mu.RLock()
+	defer s.Mu.RUnlock()
 
 	results := make([]*ua.DataValue, len(req.NodesToRead))
 	for i, n := range req.NodesToRead {
@@ -30,7 +35,7 @@ func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request) (ua.Res
 			Status:          ua.StatusBad,
 		}
 
-		key := n.NodeID.String()
+		key := strip_sequals(n.NodeID.String())
 
 		// we would normally look up the node in our actual address space, but since that's dumb, we're just
 		// going to use the node id directly to look it up from our data map.
@@ -95,11 +100,14 @@ func (s *MapReadWriter) CustomWrite(sc *uasc.SecureChannel, r ua.Request) (ua.Re
 		return nil, err
 	}
 
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+
 	status := ua.StatusBad
 
 	for _, n := range req.NodesToWrite {
 		debug.Printf("write: node=%s attr=%s", n.NodeID, n.AttributeID)
-		key := n.NodeID.String()
+		key := strip_sequals(n.NodeID.String())
 
 		// we would normally look up the node in our actual address space, but since that's dumb, we're just
 		// going to use the node id directly to look it up from our data map.
@@ -123,4 +131,78 @@ func (s *MapReadWriter) CustomWrite(sc *uasc.SecureChannel, r ua.Request) (ua.Re
 	}
 
 	return response, nil
+}
+
+func (s *MapReadWriter) CustomBrowse(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+	req, err := safeReq[*ua.BrowseRequest](r)
+	if err != nil {
+		return nil, err
+	}
+	s.Mu.RLock()
+	defer s.Mu.RUnlock()
+
+	resp := &ua.BrowseResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      req.RequestHeader.RequestHandle,
+			ServiceResult:      ua.StatusOK,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+
+		Results: make([]*ua.BrowseResult, len(req.NodesToBrowse)),
+	}
+
+	/*keys := make([]string, len(s.Data))
+	i := 0
+	for k := range s.Data {
+		keys[i] = k
+		i++
+	}
+
+	slices.Sort(keys)
+	*/
+
+	count := len(req.NodesToBrowse)
+
+	debug.Printf("BrowseRequest: len(req.NodesToBrowse)=%d", count)
+
+	for i, bd := range req.NodesToBrowse {
+		debug.Printf("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
+		if bd.NodeID.IntID() != 84 {
+
+			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBadNodeIDUnknown}
+			continue
+		}
+
+		refs := make([]*ua.ReferenceDescription, len(s.Data))
+
+		keyid := 0
+		for k := range s.Data {
+			key := k
+			newid := ua.NewStringNodeID(0, key)
+			expnewid := ua.NewStringExpandedNodeID(0, key)
+
+			refs[keyid] = &ua.ReferenceDescription{
+				ReferenceTypeID: newid,
+				NodeID:          expnewid,
+				BrowseName:      &ua.QualifiedName{NamespaceIndex: 0, Name: key},
+				DisplayName:     &ua.LocalizedText{Text: key},
+				TypeDefinition:  expnewid,
+			}
+			keyid++
+		}
+
+		resp.Results[i] = &ua.BrowseResult{
+			StatusCode: ua.StatusGood,
+			References: refs,
+		}
+	}
+
+	return resp, nil
+}
+
+func strip_sequals(s string) string {
+	return strings.TrimPrefix(s, "s=")
 }
