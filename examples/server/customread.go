@@ -152,6 +152,9 @@ func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request) (ua.Res
 			dv.Status = ua.StatusOK
 			dv.EncodingMask |= ua.DataValueValue
 			v := s.Data[key]
+			if key == "Tag1" {
+				log.Printf("got tag1")
+			}
 			switch tv := v.(type) {
 			case string:
 				dv.Value = ua.MustVariant(tv)
@@ -171,7 +174,79 @@ func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request) (ua.Res
 				dv.Value = ua.MustVariant(tv)
 			}
 		}
+		if n.AttributeID == ua.AttributeIDDescription {
+			dv.Status = ua.StatusOK
+			dv.EncodingMask |= ua.DataValueValue
+			dv.Value = ua.MustVariant("")
+		}
 
+		// values are in section 5.1.2 of the standard.
+		// https://reference.opcfoundation.org/Core/Part6/v104/docs/5.1.2
+		if n.AttributeID == ua.AttributeIDDataType {
+			dv.Status = ua.StatusOK
+			dv.EncodingMask |= ua.DataValueValue
+			v := s.Data[key]
+			if key == "Tag1" {
+				log.Printf("got tag1")
+			}
+			switch v.(type) {
+			case string:
+				dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 12))
+				if err != nil {
+					log.Printf("problem creating variant: %v", err)
+				}
+			case int:
+				// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
+				// have to worry about cutting data off.
+				dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
+				if err != nil {
+					log.Printf("problem creating variant: %v", err)
+				}
+			case int32:
+				dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
+				if err != nil {
+					log.Printf("problem creating variant: %v", err)
+				}
+			case float32:
+				dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 10))
+				if err != nil {
+					log.Printf("problem creating variant: %v", err)
+				}
+			case float64:
+				dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 11))
+				if err != nil {
+					log.Printf("problem creating variant: %v", err)
+				}
+			case bool:
+				dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 1))
+				if err != nil {
+					log.Printf("problem creating variant: %v", err)
+				}
+			default:
+				dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 24))
+				if err != nil {
+					log.Printf("problem creating variant: %v", err)
+				}
+			}
+		}
+
+		// when we support arrays this will have to change.
+		if n.AttributeID == ua.AttributeIDValueRank {
+			dv.Status = ua.StatusOK
+			dv.EncodingMask |= ua.DataValueValue
+			dv.Value = ua.MustVariant(int32(-1))
+		}
+
+		// when we support arrays this will have to change.
+		if n.AttributeID == ua.AttributeIDArrayDimensions {
+			dv.Status = ua.StatusOK
+			dv.EncodingMask |= ua.DataValueValue
+			dv.Value = ua.MustVariant([]uint32{})
+		}
+
+		if dv.Value == nil {
+			log.Printf("bad dv.Value!")
+		}
 		debug.Printf("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
 
 		results[i] = dv
@@ -260,7 +335,8 @@ func (s *MapReadWriter) CustomBrowse(sc *uasc.SecureChannel, r ua.Request) (ua.R
 			AdditionalHeader:   ua.NewExtensionObject(nil),
 		},
 
-		Results: make([]*ua.BrowseResult, len(req.NodesToBrowse)),
+		Results:         make([]*ua.BrowseResult, len(req.NodesToBrowse)),
+		DiagnosticInfos: []*ua.DiagnosticInfo{{}},
 	}
 
 	/*keys := make([]string, len(s.Data))
@@ -324,9 +400,11 @@ func (s *MapReadWriter) CustomBrowse(sc *uasc.SecureChannel, r ua.Request) (ua.R
 
 			refs[keyid] = &ua.ReferenceDescription{
 				ReferenceTypeID: newid,
+				IsForward:       true,
 				NodeID:          expnewid,
 				BrowseName:      &ua.QualifiedName{NamespaceIndex: 0, Name: key},
-				DisplayName:     &ua.LocalizedText{Text: key},
+				DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: key},
+				NodeClass:       ua.NodeClassVariable,
 				TypeDefinition:  expnewid,
 			}
 			keyid++

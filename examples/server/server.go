@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	endpoint = flag.String("endpoint", "opc.tcp://192.168.2.66:4840", "OPC UA Endpoint URL")
+	endpoint = flag.String("endpoint", "opc.tcp://127.0.0.1:4840", "OPC UA Endpoint URL")
 	certfile = flag.String("cert", "cert.pem", "Path to certificate file")
 	keyfile  = flag.String("key", "key.pem", "Path to PEM Private Key file")
 	gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
