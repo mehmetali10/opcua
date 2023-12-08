@@ -109,11 +109,24 @@ func main() {
 	mrw.PublishRequests = make(chan PubReq, 100)
 	mrw.Data = make(map[string]any)
 
+	num := 42
+
 	mrw.Data["Tag1"] = 123.4
 	mrw.Data["Tag2"] = 42
 	mrw.Data["Tag3.Tag4"] = "some string"
 	mrw.Data["Tag5"] = true
 	mrw.Data["Tag6"] = time.Now()
+
+	// some background process updating the map
+	go func() {
+		for {
+			num++
+			mrw.Mu.Lock()
+			mrw.Data["Tag2"] = num
+			mrw.Mu.Unlock()
+			time.Sleep(time.Second)
+		}
+	}()
 
 	// register our custom read handler.
 	s.RegisterHandler(id.ReadRequest_Encoding_DefaultBinary, mrw.CustomRead)
