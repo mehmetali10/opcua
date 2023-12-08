@@ -29,7 +29,7 @@ var (
 )
 
 func main() {
-	flag.BoolVar(&debug.Enable, "debug", true, "enable debug logging")
+	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
 
@@ -105,8 +105,10 @@ func main() {
 	))
 
 	mrw := MapReadWriter{}
-	mrw.Subs = make([]*MapReadWriterSub, 0)
+	mrw.Subs = make(map[uint32]*MapReadWriterSub)
+	mrw.PublishRequests = make(chan struct{}, 100)
 	mrw.Data = make(map[string]any)
+
 	mrw.Data["Tag1"] = 123.4
 	mrw.Data["Tag2"] = 42
 	mrw.Data["Tag3.Tag4"] = "some string"

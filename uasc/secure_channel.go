@@ -1049,6 +1049,53 @@ func (s *SecureChannel) SendResponseWithContext(ctx context.Context, reqID uint3
 	return s.sendResponseWithContext(ctx, nil, reqID, resp)
 }
 
+func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channelInstance, reqID uint32, resp any) error {
+	typeID := ua.ServiceTypeID(resp)
+	if typeID == 0 {
+		return errors.Errorf("uasc: unknown service %T. Did you call register?", resp)
+	}
+
+	var err error
+	if instance == nil {
+		instance, err = s.getActiveChannelInstance()
+		if err != nil {
+			return err
+		}
+	}
+
+	// encode the message
+	m := instance.newMessage(resp, typeID, reqID)
+	b, err := m.Encode()
+	if err != nil {
+		return err
+	}
+
+	// encrypt the message prior to sending it
+	// if SecurityMode == None, this returns the byte stream untouched
+	b, err = instance.signAndEncrypt(m, b)
+	if err != nil {
+		return err
+	}
+
+	// send the message
+	n, err := s.c.Write(b)
+	if err != nil {
+		return err
+	}
+
+	// todo(fs): what if len(b) != n? Can this happen?
+	if len(b) != n {
+		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", resp, len(b), n)
+	}
+
+	atomic.AddUint64(&instance.bytesSent, uint64(n))
+	atomic.AddUint32(&instance.messagesSent, 1)
+
+	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
+
+	return nil
+}
+
 func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *channelInstance, reqID uint32, resp ua.Response) error {
 	typeID := ua.ServiceTypeID(resp)
 	if typeID == 0 {
