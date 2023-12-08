@@ -14,11 +14,16 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+type PubReq struct {
+	Req *ua.PublishRequest
+	ID  uint32
+}
+
 type MapReadWriter struct {
 	Mu              sync.RWMutex
 	Data            map[string]any
 	Subs            map[uint32]*MapReadWriterSub
-	PublishRequests chan struct{}
+	PublishRequests chan PubReq
 }
 
 type MapReadWriterSub struct {
@@ -31,11 +36,13 @@ type MapReadWriterSub struct {
 	TagListLock               sync.Mutex
 	Channel                   *uasc.SecureChannel
 	SequenceID                uint32
+	SeqNums                   map[uint32]struct{}
 }
 
 func NewMapReadWriterSub() *MapReadWriterSub {
 	return &MapReadWriterSub{
-		Tags: map[uint32]string{},
+		Tags:    map[uint32]string{},
+		SeqNums: map[uint32]struct{}{},
 	}
 }
 
@@ -57,6 +64,8 @@ func (s *MapReadWriterSub) run() {
 			log.Print("No tags in sub list")
 			continue
 		}
+		log.Printf("Waiting for publish req on sub #%d", s.ID)
+		pubreq := <-s.MapReadWriter.PublishRequests
 		// see if we have any tags
 		s.SequenceID++
 		log.Printf("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
@@ -88,10 +97,18 @@ func (s *MapReadWriterSub) run() {
 			default:
 				dv.Value = ua.MustVariant(tv)
 			}
-			vals[i].ClientHandle = uint32(i)
+			dv.EncodingMask |= ua.DataValueStatusCode
+			dv.Status = ua.StatusOK
+			dv.EncodingMask |= ua.DataValueSourceTimestamp
+			dv.SourceTimestamp = time.Now()
+			dv.EncodingMask |= ua.DataValueValue
+			vals[i].ClientHandle = i
 			vals[i].Value = dv
-			vals[i].Value.EncodingMask |= ua.DataValueValue
 			log.Printf("Value: %v", dv.Value.Value())
+		}
+		for x := range pubreq.Req.SubscriptionAcknowledgements {
+			a := pubreq.Req.SubscriptionAcknowledgements[x]
+			delete(s.SeqNums, a.SequenceNumber)
 		}
 		log.Printf("values: %v", *vals[0])
 		s.TagListLock.Unlock()
@@ -108,11 +125,20 @@ func (s *MapReadWriterSub) run() {
 			PublishTime:      time.Now(),
 			NotificationData: eo,
 		}
+		s.SeqNums[s.SequenceID] = struct{}{}
+
+		seqnums := make([]uint32, len(s.SeqNums))
+		idx := 0
+		for i := range s.SeqNums {
+			seqnums[idx] = i
+			idx++
+		}
+		log.Printf("sequence numbers: %d", seqnums)
 
 		response := &ua.PublishResponse{
 			ResponseHeader: &ua.ResponseHeader{
 				Timestamp:          time.Now(),
-				RequestHandle:      s.SequenceID,
+				RequestHandle:      pubreq.Req.RequestHeader.RequestHandle,
 				ServiceResult:      ua.StatusOK,
 				ServiceDiagnostics: &ua.DiagnosticInfo{},
 				StringTable:        []string{},
@@ -121,11 +147,11 @@ func (s *MapReadWriterSub) run() {
 			SubscriptionID:           s.ID,
 			MoreNotifications:        false,
 			NotificationMessage:      &msg,
-			AvailableSequenceNumbers: []uint32{s.SequenceID},
+			AvailableSequenceNumbers: seqnums,
 			Results:                  []ua.StatusCode{},
 			DiagnosticInfos:          []*ua.DiagnosticInfo{},
 		}
-		err := s.Channel.SendResponseWithContext(context.Background(), s.SequenceID, response)
+		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
 		if err != nil {
 			log.Printf("problem sending channel response: %v", err)
 			log.Printf("Killing subscription %d", s.ID)
@@ -133,12 +159,10 @@ func (s *MapReadWriterSub) run() {
 		}
 		log.Printf("Publish OK for %d", s.ID)
 		// wait till we've got a publish request.
-		log.Printf("Waiting for publish req on sub #%d", s.ID)
-		<-s.MapReadWriter.PublishRequests
 	}
 }
 
-func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.ReadRequest](r)
@@ -310,7 +334,7 @@ func safeReq[T ua.Request](r ua.Request) (T, error) {
 	return req, nil
 }
 
-func (s *MapReadWriter) CustomWrite(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MapReadWriter) CustomWrite(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.WriteRequest](r)
 	if err != nil {
@@ -350,7 +374,7 @@ func (s *MapReadWriter) CustomWrite(sc *uasc.SecureChannel, r ua.Request) (ua.Re
 	return response, nil
 }
 
-func (s *MapReadWriter) CustomBrowse(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MapReadWriter) CustomBrowse(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	req, err := safeReq[*ua.BrowseRequest](r)
 	if err != nil {
 		return nil, err
@@ -460,7 +484,7 @@ func strip_crap(s string) string {
 	return s[seq_pos+2:]
 }
 
-func (s *MapReadWriter) CreateSubscription(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MapReadWriter) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
@@ -479,6 +503,7 @@ func (s *MapReadWriter) CreateSubscription(sc *uasc.SecureChannel, r ua.Request)
 		RevisedPublishingInterval: req.RequestedPublishingInterval,
 		RevisedLifetimeCount:      req.RequestedLifetimeCount,
 		RevisedMaxKeepAliveCount:  req.RequestedMaxKeepAliveCount,
+		SeqNums:                   make(map[uint32]struct{}),
 	}
 	s.Subs[newsubid] = &sub
 	sub.Start()
@@ -502,7 +527,7 @@ func (s *MapReadWriter) CreateSubscription(sc *uasc.SecureChannel, r ua.Request)
 
 //PublishRequest_Encoding_DefaultBinary
 
-func (s *MapReadWriter) Publish(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MapReadWriter) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	log.Printf("Raw Publish req")
 
 	req, err := safeReq[*ua.PublishRequest](r)
@@ -510,30 +535,33 @@ func (s *MapReadWriter) Publish(sc *uasc.SecureChannel, r ua.Request) (ua.Respon
 		log.Printf("ERROR: bad PublishRequest Struct")
 		return nil, err
 	}
-	res := make([]ua.StatusCode, len(req.SubscriptionAcknowledgements))
 
-	for i := range req.SubscriptionAcknowledgements {
-		subID := req.SubscriptionAcknowledgements[i].SubscriptionID
-		log.Printf("Raw sub req for #%d", subID)
-		_, ok := s.Subs[subID]
-		if !ok {
-			// bad sub ID.
-			res[i] = ua.StatusBadSubscriptionIDInvalid
-			continue
+	// at some point, if the sub req fails we need to send a response back about it.
+	/*
+		res := make([]ua.StatusCode, len(req.SubscriptionAcknowledgements))
+		for i := range req.SubscriptionAcknowledgements {
+			subID := req.SubscriptionAcknowledgements[i].SubscriptionID
+			log.Printf("Raw sub req for #%d", subID)
+			_, ok := s.Subs[subID]
+			if !ok {
+				// bad sub ID.
+				res[i] = ua.StatusBadSubscriptionIDInvalid
+				continue
+			}
+			// if the sub request buffer isn't full we're OK otherwise send that status.
+			select {
+			case s.PublishRequests <- req:
+				res[i] = ua.StatusOK
+				log.Printf("Sub Queued for %d", subID)
+			default:
+				res[i] = ua.StatusBadTooManyPublishRequests
+				log.Printf("Sub Queue full for %d", subID)
+			}
 		}
-		// if the sub request buffer isn't full we're OK otherwise send that status.
-		select {
-		case s.PublishRequests <- struct{}{}:
-			res[i] = ua.StatusOK
-			log.Printf("Sub Queued for %d", subID)
-		default:
-			res[i] = ua.StatusBadTooManyPublishRequests
-			log.Printf("Sub Queue full for %d", subID)
-		}
-	}
+	*/
 
 	select {
-	case s.PublishRequests <- struct{}{}:
+	case s.PublishRequests <- PubReq{Req: req, ID: reqID}:
 	default:
 		log.Printf("Too many publish reqs.")
 	}
@@ -560,7 +588,7 @@ func (s *MapReadWriter) Publish(sc *uasc.SecureChannel, r ua.Request) (ua.Respon
 	return nil, nil
 }
 
-func (s *MapReadWriter) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *MapReadWriter) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)

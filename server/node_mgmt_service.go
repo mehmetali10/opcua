@@ -14,7 +14,7 @@ type NodeManagementService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.2
-func (s *NodeManagementService) AddNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *NodeManagementService) AddNodes(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.AddNodesRequest](r)
@@ -25,7 +25,7 @@ func (s *NodeManagementService) AddNodes(sc *uasc.SecureChannel, r ua.Request) (
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.3
-func (s *NodeManagementService) AddReferences(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *NodeManagementService) AddReferences(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.AddReferencesRequest](r)
@@ -36,7 +36,7 @@ func (s *NodeManagementService) AddReferences(sc *uasc.SecureChannel, r ua.Reque
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.4
-func (s *NodeManagementService) DeleteNodes(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *NodeManagementService) DeleteNodes(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.DeleteNodesRequest](r)
@@ -47,7 +47,7 @@ func (s *NodeManagementService) DeleteNodes(sc *uasc.SecureChannel, r ua.Request
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.5
-func (s *NodeManagementService) DeleteReferences(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *NodeManagementService) DeleteReferences(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.DeleteReferencesRequest](r)

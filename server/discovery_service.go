@@ -14,7 +14,7 @@ type DiscoveryService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
-func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.FindServersRequest](r)
@@ -33,7 +33,7 @@ func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request) (ua
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.3
-func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.FindServersOnNetworkRequest](r)
@@ -44,7 +44,7 @@ func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Req
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.4
-func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.GetEndpointsRequest](r)
@@ -61,7 +61,7 @@ func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request) (u
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.5
-func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.RegisterServerRequest](r)
@@ -72,7 +72,7 @@ func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request) 
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.6
-func (s *DiscoveryService) RegisterServer2(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *DiscoveryService) RegisterServer2(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.RegisterServer2Request](r)

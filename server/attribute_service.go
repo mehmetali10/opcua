@@ -16,7 +16,7 @@ type AttributeService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
-func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.ReadRequest](r)
@@ -68,7 +68,7 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request) (ua.Respon
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.3
-func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.HistoryReadRequest](r)
@@ -79,7 +79,7 @@ func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request) (ua
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
-func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.WriteRequest](r)
@@ -90,7 +90,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request) (ua.Respo
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
-func (s *AttributeService) HistoryUpdate(sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
+func (s *AttributeService) HistoryUpdate(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.HistoryUpdateRequest](r)

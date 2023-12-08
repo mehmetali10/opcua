@@ -106,7 +106,7 @@ func main() {
 
 	mrw := MapReadWriter{}
 	mrw.Subs = make(map[uint32]*MapReadWriterSub)
-	mrw.PublishRequests = make(chan struct{}, 100)
+	mrw.PublishRequests = make(chan PubReq, 100)
 	mrw.Data = make(map[string]any)
 
 	mrw.Data["Tag1"] = 123.4
