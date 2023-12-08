@@ -27,7 +27,7 @@ type MapReadWriterSub struct {
 	RevisedPublishingInterval float64
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
-	Tags                      []string
+	Tags                      map[uint32]string
 	TagListLock               sync.Mutex
 	Channel                   *uasc.SecureChannel
 	SequenceID                uint32
@@ -35,7 +35,7 @@ type MapReadWriterSub struct {
 
 func NewMapReadWriterSub() *MapReadWriterSub {
 	return &MapReadWriterSub{
-		Tags: []string{},
+		Tags: map[uint32]string{},
 	}
 }
 
@@ -48,13 +48,23 @@ func (s *MapReadWriterSub) Start() {
 // to the client at the correct rate assuming there are publish requests queued up.
 func (s *MapReadWriterSub) run() {
 	for {
+		// wait for the publish interval
+		time.Sleep(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
+		s.TagListLock.Lock()
+		l := len(s.Tags)
+		s.TagListLock.Unlock()
+		if l == 0 {
+			log.Print("No tags in sub list")
+			continue
+		}
+		// see if we have any tags
 		s.SequenceID++
 		log.Printf("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
 		// then get all the tags and send them back to the client
 
 		vals := make([]*ua.MonitoredItemNotification, len(s.Tags))
 		s.TagListLock.Lock()
-		log.Printf("Responding with %d elements", len(s.Tags))
+		log.Printf("Responding with %d elements: %v", len(s.Tags), s.Tags)
 		for i := range s.Tags {
 			vals[i] = new(ua.MonitoredItemNotification)
 			key := s.Tags[i]
@@ -80,14 +90,18 @@ func (s *MapReadWriterSub) run() {
 			}
 			vals[i].ClientHandle = uint32(i)
 			vals[i].Value = dv
+			vals[i].Value.EncodingMask |= ua.DataValueValue
+			log.Printf("Value: %v", dv.Value.Value())
 		}
+		log.Printf("values: %v", *vals[0])
 		s.TagListLock.Unlock()
 		dcn := ua.DataChangeNotification{
 			MonitoredItems:  vals,
 			DiagnosticInfos: []*ua.DiagnosticInfo{},
 		}
 		eo := make([]*ua.ExtensionObject, 1)
-		eo[0] = ua.NewExtensionObject(dcn)
+		eo[0] = ua.NewExtensionObject(&dcn)
+		eo[0].UpdateMask()
 
 		msg := ua.NotificationMessage{
 			SequenceNumber:   s.SequenceID,
@@ -104,9 +118,12 @@ func (s *MapReadWriterSub) run() {
 				StringTable:        []string{},
 				AdditionalHeader:   ua.NewExtensionObject(nil),
 			},
-			SubscriptionID:      s.ID,
-			MoreNotifications:   false,
-			NotificationMessage: &msg,
+			SubscriptionID:           s.ID,
+			MoreNotifications:        false,
+			NotificationMessage:      &msg,
+			AvailableSequenceNumbers: []uint32{s.SequenceID},
+			Results:                  []ua.StatusCode{},
+			DiagnosticInfos:          []*ua.DiagnosticInfo{},
 		}
 		err := s.Channel.SendResponseWithContext(context.Background(), s.SequenceID, response)
 		if err != nil {
@@ -115,8 +132,6 @@ func (s *MapReadWriterSub) run() {
 			return
 		}
 		log.Printf("Publish OK for %d", s.ID)
-		// then wait for the publish interval
-		time.Sleep(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
 		// wait till we've got a publish request.
 		log.Printf("Waiting for publish req on sub #%d", s.ID)
 		<-s.MapReadWriter.PublishRequests
@@ -135,8 +150,26 @@ func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request) (ua.Res
 
 	results := make([]*ua.DataValue, len(req.NodesToRead))
 	for i, n := range req.NodesToRead {
-		debug.Printf("read: node=%s attr=%s", n.NodeID, n.AttributeID)
+		log.Printf("read: node=%s attr=%s", n.NodeID, n.AttributeID)
 
+		if n.NodeID.IntID() != 0 {
+			// this is not one of our normal tags.
+			log.Printf("Got some special thing or something: %v", n.NodeID.IntID())
+			dv := &ua.DataValue{
+				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+				ServerTimestamp: time.Now(),
+				Status:          ua.StatusBad,
+			}
+			if n.NodeID.IntID() == 2259 {
+				// this is server status
+				dv.Status = ua.StatusOK
+				dv.EncodingMask |= ua.DataValueValue
+				dv.Value = ua.MustVariant(uint32(0))
+				results[i] = dv
+				continue
+			}
+
+		}
 		dv := &ua.DataValue{
 			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
 			ServerTimestamp: time.Now(),
@@ -404,7 +437,7 @@ func (s *MapReadWriter) CustomBrowse(sc *uasc.SecureChannel, r ua.Request) (ua.R
 				NodeID:          expnewid,
 				BrowseName:      &ua.QualifiedName{NamespaceIndex: 0, Name: key},
 				DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: key},
-				NodeClass:       ua.NodeClassVariable,
+				NodeClass:       ua.NodeClassVariable, // when support is added for nested maps, this will be NodeClassObject
 				TypeDefinition:  expnewid,
 			}
 			keyid++
@@ -546,19 +579,19 @@ func (s *MapReadWriter) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Reques
 		return nil, errors.New("sub doesn't exist")
 	}
 	s.Subs[subID].TagListLock.Lock()
-	s.Subs[subID].Tags = make([]string, 0)
+	s.Subs[subID].Tags = make(map[uint32]string)
 	for i := range req.ItemsToCreate {
 		item := req.ItemsToCreate[i]
 		monitored_key := item.ItemToMonitor.NodeID.String()
 		monitored_key = strip_crap(monitored_key)
-		log.Printf("Adding monitored item '%s' to sub #%d", monitored_key, subID)
-		s.Subs[subID].Tags = append(s.Subs[subID].Tags, monitored_key)
+		log.Printf("Adding monitored item '%s' to sub #%d as %d", monitored_key, subID, item.RequestedParameters.ClientHandle)
+		s.Subs[subID].Tags[item.RequestedParameters.ClientHandle] = monitored_key
 		res[i] = &ua.MonitoredItemCreateResult{
 			StatusCode:              ua.StatusOK,
 			MonitoredItemID:         uint32(i),
 			RevisedSamplingInterval: s.Subs[subID].RevisedPublishingInterval,
 			RevisedQueueSize:        1,
-			FilterResult:            &ua.ExtensionObject{},
+			FilterResult:            ua.NewExtensionObject(nil),
 		}
 
 	}

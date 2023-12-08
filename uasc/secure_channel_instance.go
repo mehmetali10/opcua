@@ -6,6 +6,7 @@ package uasc
 
 import (
 	"encoding/binary"
+	"log"
 	"math"
 	"sync"
 	"time"
@@ -85,6 +86,7 @@ func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authTo
 
 func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID uint32) *Message {
 	sequenceNumber := c.nextSequenceNumber()
+	log.Printf("got sequence number %d", sequenceNumber)
 
 	switch typeID {
 	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:

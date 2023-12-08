@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"io"
+	"log"
 	"math"
 	"strings"
 	"sync"
@@ -1022,6 +1023,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		}
 		if i > 0 { // fix sequence number on subsequent chunks
 			number := instance.nextSequenceNumber()
+			log.Printf("burning sequence number %d", number)
 			binary.LittleEndian.PutUint32(chunk[16:], uint32(number))
 		}
 
@@ -1063,6 +1065,7 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 		}
 	}
 
+	// we need to get a lock on the sequence number so we are sure to send them in the correct order.
 	// encode the message
 	m := instance.newMessage(resp, typeID, reqID)
 	b, err := m.Encode()
@@ -1109,11 +1112,14 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 			return err
 		}
 	}
+	instance.Lock()
+	defer instance.Unlock()
 
 	// encode the message
 	m := instance.newMessage(resp, typeID, reqID)
 	b, err := m.Encode()
 	if err != nil {
+		log.Printf("Error encoding msg: %v", err)
 		return err
 	}
 
