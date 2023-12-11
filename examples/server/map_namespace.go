@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,155 +12,26 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
-type PubReq struct {
-	Req *ua.PublishRequest
-	ID  uint32
-}
-
-type MapReadWriter struct {
+type MapNamespace struct {
+	name            string
 	Mu              sync.RWMutex
 	Data            map[string]any
 	Subs            map[uint32]*MapReadWriterSub
 	PublishRequests chan PubReq
+
+	id uint16
 }
 
-type MapReadWriterSub struct {
-	MapReadWriter             *MapReadWriter
-	ID                        uint32
-	RevisedPublishingInterval float64
-	RevisedLifetimeCount      uint32
-	RevisedMaxKeepAliveCount  uint32
-	Tags                      map[uint32]string
-	TagListLock               sync.Mutex
-	Channel                   *uasc.SecureChannel
-	SequenceID                uint32
-	SeqNums                   map[uint32]struct{}
+func NewMapNamespace(name string) MapNamespace {
+	mrw := MapNamespace{}
+	mrw.name = name
+	mrw.Subs = make(map[uint32]*MapReadWriterSub)
+	mrw.PublishRequests = make(chan PubReq, 100)
+	mrw.Data = make(map[string]any)
+	return mrw
 }
 
-func NewMapReadWriterSub() *MapReadWriterSub {
-	return &MapReadWriterSub{
-		Tags:    map[uint32]string{},
-		SeqNums: map[uint32]struct{}{},
-	}
-}
-
-func (s *MapReadWriterSub) Start() {
-	go s.run()
-
-}
-
-// this function should be run as a go-routine and will handle sending data out
-// to the client at the correct rate assuming there are publish requests queued up.
-func (s *MapReadWriterSub) run() {
-	for {
-		// wait for the publish interval
-		time.Sleep(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
-		s.TagListLock.Lock()
-		l := len(s.Tags)
-		s.TagListLock.Unlock()
-		if l == 0 {
-			log.Print("No tags in sub list")
-			continue
-		}
-		log.Printf("Waiting for publish req on sub #%d", s.ID)
-		pubreq := <-s.MapReadWriter.PublishRequests
-		// see if we have any tags
-		s.SequenceID++
-		log.Printf("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
-		// then get all the tags and send them back to the client
-
-		vals := make([]*ua.MonitoredItemNotification, len(s.Tags))
-		s.TagListLock.Lock()
-		log.Printf("Responding with %d elements: %v", len(s.Tags), s.Tags)
-		for i := range s.Tags {
-			vals[i] = new(ua.MonitoredItemNotification)
-			key := s.Tags[i]
-			v := s.MapReadWriter.Data[key]
-			dv := new(ua.DataValue)
-			switch tv := v.(type) {
-			case string:
-				dv.Value = ua.MustVariant(tv)
-			case int:
-				// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
-				// have to worry about cutting data off.
-				dv.Value = ua.MustVariant(int64(tv))
-			case int32:
-				dv.Value = ua.MustVariant(tv)
-			case float32:
-				dv.Value = ua.MustVariant(tv)
-			case float64:
-				dv.Value = ua.MustVariant(tv)
-			case bool:
-				dv.Value = ua.MustVariant(tv)
-			default:
-				dv.Value = ua.MustVariant(tv)
-			}
-			dv.EncodingMask |= ua.DataValueStatusCode
-			dv.Status = ua.StatusOK
-			dv.EncodingMask |= ua.DataValueSourceTimestamp
-			dv.SourceTimestamp = time.Now()
-			dv.EncodingMask |= ua.DataValueValue
-			vals[i].ClientHandle = i
-			vals[i].Value = dv
-			log.Printf("Value: %v", dv.Value.Value())
-		}
-		for x := range pubreq.Req.SubscriptionAcknowledgements {
-			a := pubreq.Req.SubscriptionAcknowledgements[x]
-			delete(s.SeqNums, a.SequenceNumber)
-		}
-		log.Printf("values: %v", *vals[0])
-		s.TagListLock.Unlock()
-		dcn := ua.DataChangeNotification{
-			MonitoredItems:  vals,
-			DiagnosticInfos: []*ua.DiagnosticInfo{},
-		}
-		eo := make([]*ua.ExtensionObject, 1)
-		eo[0] = ua.NewExtensionObject(&dcn)
-		eo[0].UpdateMask()
-
-		msg := ua.NotificationMessage{
-			SequenceNumber:   s.SequenceID,
-			PublishTime:      time.Now(),
-			NotificationData: eo,
-		}
-		s.SeqNums[s.SequenceID] = struct{}{}
-
-		seqnums := make([]uint32, len(s.SeqNums))
-		idx := 0
-		for i := range s.SeqNums {
-			seqnums[idx] = i
-			idx++
-		}
-		log.Printf("sequence numbers: %d", seqnums)
-
-		response := &ua.PublishResponse{
-			ResponseHeader: &ua.ResponseHeader{
-				Timestamp:          time.Now(),
-				RequestHandle:      pubreq.Req.RequestHeader.RequestHandle,
-				ServiceResult:      ua.StatusOK,
-				ServiceDiagnostics: &ua.DiagnosticInfo{},
-				StringTable:        []string{},
-				AdditionalHeader:   ua.NewExtensionObject(nil),
-			},
-			SubscriptionID:           s.ID,
-			MoreNotifications:        false,
-			NotificationMessage:      &msg,
-			AvailableSequenceNumbers: seqnums,
-			Results:                  []ua.StatusCode{},
-			DiagnosticInfos:          []*ua.DiagnosticInfo{},
-		}
-		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
-		if err != nil {
-			log.Printf("problem sending channel response: %v", err)
-			log.Printf("Killing subscription %d", s.ID)
-			return
-		}
-		log.Printf("Publish OK for %d", s.ID)
-		// wait till we've got a publish request.
-	}
-}
-
-func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+func (s *MapNamespace) CustomRead(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.ReadRequest](r)
@@ -235,6 +104,11 @@ func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request, reqID u
 			dv.Status = ua.StatusOK
 			dv.EncodingMask |= ua.DataValueValue
 			dv.Value = ua.MustVariant("")
+		}
+		if n.AttributeID == ua.AttributeIDEventNotifier {
+			dv.Status = ua.StatusOK
+			dv.EncodingMask |= ua.DataValueValue
+			dv.Value = ua.MustVariant(int16(0))
 		}
 
 		// values are in section 5.1.2 of the standard.
@@ -324,167 +198,7 @@ func (s *MapReadWriter) CustomRead(sc *uasc.SecureChannel, r ua.Request, reqID u
 	return response, nil
 }
 
-func safeReq[T ua.Request](r ua.Request) (T, error) {
-	var t T
-	req, ok := r.(T)
-	if !ok {
-		debug.Printf("expected %T, got %T", t, r)
-		return t, ua.StatusBadRequestTypeInvalid
-	}
-	return req, nil
-}
-
-func (s *MapReadWriter) CustomWrite(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-
-	req, err := safeReq[*ua.WriteRequest](r)
-	if err != nil {
-		return nil, err
-	}
-
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
-
-	status := ua.StatusBad
-
-	for _, n := range req.NodesToWrite {
-		debug.Printf("write: node=%s attr=%s", n.NodeID, n.AttributeID)
-		key := strip_crap(n.NodeID.String())
-
-		// we would normally look up the node in our actual address space, but since that's dumb, we're just
-		// going to use the node id directly to look it up from our data map.
-		if n.AttributeID == ua.AttributeIDValue {
-			v := n.Value.Value.Value()
-			s.Data[key] = v
-			status = ua.StatusOK
-			debug.Printf("write: key=%s value=%s", key, v)
-		}
-
-	}
-	response := &ua.ReadResponse{
-		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
-			RequestHandle:      req.RequestHeader.RequestHandle,
-			ServiceResult:      status,
-			ServiceDiagnostics: &ua.DiagnosticInfo{},
-			StringTable:        []string{},
-			AdditionalHeader:   ua.NewExtensionObject(nil),
-		},
-	}
-
-	return response, nil
-}
-
-func (s *MapReadWriter) CustomBrowse(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	req, err := safeReq[*ua.BrowseRequest](r)
-	if err != nil {
-		return nil, err
-	}
-	s.Mu.RLock()
-	defer s.Mu.RUnlock()
-
-	resp := &ua.BrowseResponse{
-		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
-			RequestHandle:      req.RequestHeader.RequestHandle,
-			ServiceResult:      ua.StatusOK,
-			ServiceDiagnostics: &ua.DiagnosticInfo{},
-			StringTable:        []string{},
-			AdditionalHeader:   ua.NewExtensionObject(nil),
-		},
-
-		Results:         make([]*ua.BrowseResult, len(req.NodesToBrowse)),
-		DiagnosticInfos: []*ua.DiagnosticInfo{{}},
-	}
-
-	/*keys := make([]string, len(s.Data))
-	i := 0
-	for k := range s.Data {
-		keys[i] = k
-		i++
-	}
-
-	slices.Sort(keys)
-	*/
-
-	count := len(req.NodesToBrowse)
-
-	debug.Printf("BrowseRequest: len(req.NodesToBrowse)=%d", count)
-
-	for i, bd := range req.NodesToBrowse {
-		debug.Printf("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
-		// nodes igniton tried to browse:
-		//
-		//OPCBinarySchema_TypeSystem
-		//BaseDataType
-		//ObjectsFolder
-		//Server_ServerStatus_State id# 2259 - this appears to be a keepalive / status kind of thing.  doesn't seem to actually matter
-		//
-		log.Printf("Browse req for %s", bd.NodeID.String())
-		if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
-
-			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBadNodeIDUnknown}
-			continue
-		}
-
-		if bd.NodeID.IntID() == id.RootFolder {
-
-			refs := make([]*ua.ReferenceDescription, 1)
-			newid := ua.NewNumericNodeID(0, id.ObjectsFolder)
-			expnewid := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
-			refs[0] = &ua.ReferenceDescription{
-				ReferenceTypeID: newid,
-				NodeID:          expnewid,
-				BrowseName:      &ua.QualifiedName{NamespaceIndex: 0, Name: "objects"},
-				DisplayName:     &ua.LocalizedText{Text: "objects"},
-				TypeDefinition:  expnewid,
-			}
-
-			resp.Results[i] = &ua.BrowseResult{
-				StatusCode: ua.StatusGood,
-				References: refs,
-			}
-
-			continue
-		}
-
-		refs := make([]*ua.ReferenceDescription, len(s.Data))
-
-		keyid := 0
-		for k := range s.Data {
-			key := k
-			newid := ua.NewStringNodeID(0, key)
-			expnewid := ua.NewStringExpandedNodeID(0, key)
-
-			refs[keyid] = &ua.ReferenceDescription{
-				ReferenceTypeID: newid,
-				IsForward:       true,
-				NodeID:          expnewid,
-				BrowseName:      &ua.QualifiedName{NamespaceIndex: 0, Name: key},
-				DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: key},
-				NodeClass:       ua.NodeClassVariable, // when support is added for nested maps, this will be NodeClassObject
-				TypeDefinition:  expnewid,
-			}
-			keyid++
-		}
-
-		resp.Results[i] = &ua.BrowseResult{
-			StatusCode: ua.StatusGood,
-			References: refs,
-		}
-	}
-
-	return resp, nil
-}
-
-func strip_crap(s string) string {
-	seq_pos := strings.LastIndex(s, "s=")
-	if seq_pos < 0 {
-		return s
-	}
-	return s[seq_pos+2:]
-}
-
-func (s *MapReadWriter) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+func (s *MapNamespace) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
@@ -527,7 +241,7 @@ func (s *MapReadWriter) CreateSubscription(sc *uasc.SecureChannel, r ua.Request,
 
 //PublishRequest_Encoding_DefaultBinary
 
-func (s *MapReadWriter) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+func (s *MapNamespace) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	log.Printf("Raw Publish req")
 
 	req, err := safeReq[*ua.PublishRequest](r)
@@ -588,7 +302,7 @@ func (s *MapReadWriter) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint
 	return nil, nil
 }
 
-func (s *MapReadWriter) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+func (s *MapNamespace) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
@@ -639,5 +353,77 @@ func (s *MapReadWriter) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Reques
 	}
 
 	return resp, nil
+
+}
+
+func (s *MapNamespace) ID() uint16 {
+	return s.id
+}
+func (ns *MapNamespace) SetID(id uint16) {
+	ns.id = id
+}
+
+func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
+	ns.Mu.RLock()
+	defer ns.Mu.RUnlock()
+
+	debug.Printf("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
+	// nodes igniton tried to browse:
+	//
+	//OPCBinarySchema_TypeSystem
+	//BaseDataType
+	//ObjectsFolder
+	//Server_ServerStatus_State id# 2259 - this appears to be a keepalive / status kind of thing.  doesn't seem to actually matter
+	//
+	log.Printf("Browse req for %s", bd.NodeID.String())
+	if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
+
+		return &ua.BrowseResult{StatusCode: ua.StatusBadNodeIDUnknown}
+	}
+
+	if bd.NodeID.IntID() == id.RootFolder {
+
+		refs := make([]*ua.ReferenceDescription, 1)
+		newid := ua.NewNumericNodeID(ns.id, id.ObjectsFolder)
+		expnewid := ua.NewNumericExpandedNodeID(ns.id, id.ObjectsFolder)
+		refs[0] = &ua.ReferenceDescription{
+			ReferenceTypeID: newid,
+			NodeID:          expnewid,
+			BrowseName:      &ua.QualifiedName{NamespaceIndex: ns.id, Name: "objects"},
+			DisplayName:     &ua.LocalizedText{Text: "objects"},
+			TypeDefinition:  expnewid,
+		}
+
+		return &ua.BrowseResult{
+			StatusCode: ua.StatusGood,
+			References: refs,
+		}
+
+	}
+
+	refs := make([]*ua.ReferenceDescription, len(ns.Data))
+
+	keyid := 0
+	for k := range ns.Data {
+		key := k
+		newid := ua.NewStringNodeID(ns.id, key)
+		expnewid := ua.NewStringExpandedNodeID(ns.id, key)
+
+		refs[keyid] = &ua.ReferenceDescription{
+			ReferenceTypeID: newid,
+			IsForward:       true,
+			NodeID:          expnewid,
+			BrowseName:      &ua.QualifiedName{NamespaceIndex: ns.ID(), Name: key},
+			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: key},
+			NodeClass:       ua.NodeClassVariable, // when support is added for nested maps, this will be NodeClassObject
+			TypeDefinition:  expnewid,
+		}
+		keyid++
+	}
+
+	return &ua.BrowseResult{
+		StatusCode: ua.StatusGood,
+		References: refs,
+	}
 
 }

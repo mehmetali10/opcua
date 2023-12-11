@@ -17,7 +17,6 @@ import (
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"
-	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -72,42 +71,9 @@ func main() {
 		}
 	}
 
-	n1 := server.NewNode(
-		ua.NewStringNodeID(0, "MyValueNode"),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("MyValueNode")),
-			ua.AttributeIDValue:      ua.MustVariant(123.45),
-		},
-		nil,
-		func() *ua.Variant { return ua.MustVariant("MyValue") },
-	)
-
 	s := server.New(*endpoint, opts...)
-	objects := s.AddressSpace().Objects()
-	objects.AddObject(n1)
-	objects.AddObject(server.NewNode(
-		ua.NewNumericNodeID(0, 2259),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Dunno")),
-			ua.AttributeIDValue:      ua.MustVariant(123.45),
-		},
-		nil,
-		func() *ua.Variant { return ua.MustVariant("Dunno") },
-	))
 
-	s.AddressSpace().AddNode(server.NewNode(
-		ua.NewStringNodeID(0, "TestNodeName"),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("TestNodeName")),
-		},
-		nil,
-		func() *ua.Variant { return ua.MustVariant("TestValue") },
-	))
-
-	mrw := MapReadWriter{}
-	mrw.Subs = make(map[uint32]*MapReadWriterSub)
-	mrw.PublishRequests = make(chan PubReq, 100)
-	mrw.Data = make(map[string]any)
+	mrw := NewMapNamespace("MyTestNamespace")
 
 	num := 42
 
@@ -131,11 +97,14 @@ func main() {
 	// register our custom read handler.
 	s.RegisterHandler(id.ReadRequest_Encoding_DefaultBinary, mrw.CustomRead)
 	s.RegisterHandler(id.WriteRequest_Encoding_DefaultBinary, mrw.CustomWrite)
-	s.RegisterHandler(id.BrowseRequest_Encoding_DefaultBinary, mrw.CustomBrowse)
+	//s.RegisterHandler(id.BrowseRequest_Encoding_DefaultBinary, mrw.CustomBrowse)
 
 	s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, mrw.CreateSubscription)
 	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, mrw.Publish)
 	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, mrw.CreateMonitoredItems)
+
+	mrw_id := s.AddNamespace(&mrw)
+	log.Printf("map namespace added at index %d", mrw_id)
 
 	if err := s.Start(context.Background()); err != nil {
 		log.Fatalf("Error starting server, exiting: %s", err)

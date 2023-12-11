@@ -35,12 +35,11 @@ type Server struct {
 	mu         sync.Mutex
 	status     *ua.ServerStatusDataType
 	endpoints  []*ua.EndpointDescription
-	namespaces []string
+	namespaces []NameSpace
 
 	l  *uacp.Listener
 	cb *channelBroker
 	sb *sessionBroker
-	as *AddressSpace
 
 	// nextSecureChannelID uint32
 
@@ -97,10 +96,9 @@ func New(url string, opts ...Option) *Server {
 		cfg:      cfg,
 		cb:       newChannelBroker(),
 		sb:       newSessionBroker(),
-		as:       NewAddressSpace(),
 		handlers: make(map[uint16]Handler),
-		namespaces: []string{
-			"http://opcfoundation.org/UA/", // ns:0
+		namespaces: []NameSpace{
+			NewNameSpace("http://opcfoundation.org/UA/"), // ns:0
 		},
 		status: &ua.ServerStatusDataType{
 			StartTime:   time.Now(),
@@ -121,36 +119,61 @@ func New(url string, opts ...Option) *Server {
 
 	// init server address space
 	for _, n := range PredefinedNodes() {
-		s.as.AddNode(n)
+		s.namespaces[0].AddNode(n)
 	}
-	s.as.AddNode(CurrentTimeNode())
-	s.as.AddNode(NamespacesNode(s))
-	s.as.AddNode(ServerStatusNode(s))
+	s.namespaces[0].AddNode(CurrentTimeNode())
+	s.namespaces[0].AddNode(NamespacesNode(s))
+	s.namespaces[0].AddNode(ServerStatusNode(s))
 	for _, n := range ServerCapabilitiesNodes(s) {
-		s.as.AddNode(n)
+		s.namespaces[0].AddNode(n)
 	}
 
 	return s
 }
 
-func (s *Server) Namespaces() []string {
+func (s *Server) Namespace(id int) (NameSpace, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if id < len(s.namespaces) {
+		return s.namespaces[id], nil
+	}
+	return nil, fmt.Errorf("namespace %d not found", id)
+}
+
+func (s *Server) Namespaces() []NameSpace {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.namespaces
 }
 
-func (s *Server) AddNamespace(ns string) int {
+func (s *Server) AddNamespace(ns NameSpace) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if idx := slices.Index(s.namespaces, ns); idx >= 0 {
 		return idx
 	}
+	ns.SetID(uint16(len(s.namespaces)))
 	s.namespaces = append(s.namespaces, ns)
-	return len(s.namespaces)
-}
 
-func (s *Server) AddressSpace() *AddressSpace {
-	return s.as
+	if ns.ID() == 0 {
+		return 0
+
+	}
+
+	// add the root of the new namespace to the global root.
+	ns0 := s.namespaces[0]
+	r0 := ns0.Root()
+	nr := ns.Root()
+	//r0.AddObject(nr)
+	r0.refs = append(r0.refs, nr.refs...)
+
+	o0 := ns0.Objects()
+	no := ns.Objects()
+	//o0.AddObject(no)
+
+	o0.refs = append(r0.refs, no.refs...)
+
+	return len(s.namespaces)
 }
 
 func (s *Server) Endpoints() []*ua.EndpointDescription {
@@ -206,19 +229,6 @@ func (s *Server) Start(ctx context.Context) error {
 	go s.monitorConnections(ctx)
 
 	return nil
-}
-
-func (s *Server) RegisterNamespace(ns string) uint16 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i, url := range s.namespaces {
-		if ns == url {
-			return uint16(i)
-		}
-	}
-	// todo(fs): check for correct format (if there is one)
-	s.namespaces = append(s.namespaces, ns)
-	return uint16(len(s.namespaces))
 }
 
 func (s *Server) setServerState(state ua.ServerState) {

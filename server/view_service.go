@@ -1,6 +1,9 @@
 package server
 
 import (
+	"log"
+	"time"
+
 	"golang.org/x/exp/slices"
 
 	"github.com/gopcua/opcua/debug"
@@ -22,44 +25,74 @@ type ViewService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
 func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.BrowseRequest](r)
 	if err != nil {
 		return nil, err
 	}
+	log.Print("=== Browse incoming")
 
 	resp := &ua.BrowseResponse{
-		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-		Results:        make([]*ua.BrowseResult, len(req.NodesToBrowse)),
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      req.RequestHeader.RequestHandle,
+			ServiceResult:      ua.StatusOK,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		Results: make([]*ua.BrowseResult, len(req.NodesToBrowse)),
+
+		DiagnosticInfos: []*ua.DiagnosticInfo{{}},
 	}
 
-	count := len(req.NodesToBrowse)
-	debug.Printf("BrowseRequest: len(req.NodesToBrowse)=%d", count)
-
-	for i, bd := range req.NodesToBrowse {
-		node := s.srv.AddressSpace().Node(bd.NodeID)
-		if node == nil {
-			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBadNodeIDUnknown}
+	for i := range req.NodesToBrowse {
+		br := req.NodesToBrowse[i]
+		log.Printf("    Browse of %s", br.NodeID.String())
+		ns, err := s.srv.Namespace(int(br.NodeID.Namespace()))
+		if err != nil {
+			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBad}
 			continue
 		}
-		debug.Printf("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
-
-		var refs []*ua.ReferenceDescription
-		for _, ref := range node.refs {
-			if !s.suitableRef(bd, ref) {
-				continue
-			}
-			refs = append(refs, ref)
-		}
-
-		resp.Results[i] = &ua.BrowseResult{
-			StatusCode: ua.StatusGood,
-			References: refs,
+		if br.NodeID.IntID() == id.ObjectsFolder && br.NodeID.Namespace() == 0 {
+			//resp.Results[i] = getFakeObjects()
+			//resp.Results[i] = s.srv.namespaces[1].Browse(br)
+			resp.Results[i] = ns.Browse(br)
+		} else {
+			resp.Results[i] = ns.Browse(br)
 		}
 	}
 
 	return resp, nil
+
+}
+
+func getFakeObjects() *ua.BrowseResult {
+	refs := make([]*ua.ReferenceDescription, 1)
+
+	key := "ImAnObjectHarry"
+	myid := uint32(85)
+	ns := uint16(1)
+
+	//newid := ua.NewNumericNodeID(ns, myid)
+	expnewid := ua.NewNumericExpandedNodeID(ns, myid)
+
+	reftype := ua.NewNumericNodeID(0, id.Organizes) // folder
+
+	refs[0] = &ua.ReferenceDescription{
+		ReferenceTypeID: reftype,
+		IsForward:       true,
+		NodeID:          expnewid,
+		BrowseName:      &ua.QualifiedName{NamespaceIndex: ns, Name: key},
+		DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: key},
+		NodeClass:       ua.NodeClassObject,
+		TypeDefinition:  expnewid,
+	}
+
+	return &ua.BrowseResult{
+		StatusCode: ua.StatusGood,
+		References: refs,
+	}
 }
 
 func (s *ViewService) suitableRef(desc *ua.BrowseDescription, ref *ua.ReferenceDescription) bool {
@@ -112,7 +145,12 @@ func (s *ViewService) suitableRefType(ref1, ref2 *ua.NodeID, subtypes bool) bool
 
 func (s *ViewService) getSubRefs(nid *ua.NodeID) []*ua.NodeID {
 	var refs []*ua.NodeID
-	node := s.srv.AddressSpace().Node(nid)
+	ns, err := s.srv.Namespace(int(nid.Namespace()))
+	if err != nil {
+		// TODO: return error
+		return nil
+	}
+	node := ns.Node(nid)
 	if node == nil {
 		return nil
 	}

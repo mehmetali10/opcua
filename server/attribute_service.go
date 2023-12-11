@@ -33,8 +33,13 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint
 			ServerTimestamp: time.Now(),
 		}
 
-		a := s.srv.AddressSpace()
-		v, err := a.Attribute(n.NodeID, n.AttributeID)
+		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
+		if err != nil {
+			return &ua.ReadResponse{
+				ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBad),
+			}, err
+		}
+		v, err := ns.Node(n.NodeID).Attribute(n.AttributeID)
 		switch x := err.(type) {
 		case nil:
 			dv.EncodingMask |= ua.DataValueStatusCode | ua.DataValueValue

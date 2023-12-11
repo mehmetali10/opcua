@@ -31,7 +31,7 @@ type Node struct {
 	refs References
 	val  ValueFunc
 
-	as *AddressSpace
+	ns NameSpace
 }
 
 func NewNode(id *ua.NodeID, attr Attributes, refs References, val ValueFunc) *Node {
@@ -157,7 +157,7 @@ func (n *Node) AddObject(o *Node) *Node {
 	}
 	nn.SetNodeClass(ua.NodeClassObject)
 	n.refs = append(n.refs, refs.Organizes(nn.id, nn.BrowseName().Name, nn.DisplayName().Text, nn.DataType()))
-	return n.as.AddNode(nn)
+	return n.ns.AddNode(nn)
 }
 
 func (n *Node) AddVariable(o *Node) *Node {
