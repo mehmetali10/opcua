@@ -110,7 +110,7 @@ func main() {
 	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, mrw.Publish)
 	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, mrw.CreateMonitoredItems)
 
-	mrw_id := s.AddNamespace(mrw, false, false)
+	mrw_id := s.AddNamespace(mrw, false, true)
 	log.Printf("map namespace added at index %d", mrw_id)
 	mrw_id2 := s.AddNamespace(mrw2, false, true)
 	log.Printf("map namespace added at index %d", mrw_id2)

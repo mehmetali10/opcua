@@ -26,7 +26,14 @@ func NamespacesNode(s *Server) *Node {
 			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Namespaces")),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(s.Namespaces()) },
+		func() *ua.Variant {
+			n := s.Namespaces()
+			ns := make([]string, len(n))
+			for i := range ns {
+				ns[i] = n[i].Name()
+			}
+			return ua.MustVariant(ns)
+		},
 	)
 }
 

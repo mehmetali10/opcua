@@ -88,9 +88,9 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 		}
 	}
 	return &ua.DataValue{
-		EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+		EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode | ua.DataValueValue,
 		ServerTimestamp: time.Now(),
-		Status:          ua.StatusBadNodeIDInvalid,
+		Status:          ua.StatusOK,
 		Value:           a.Value,
 	}
 }
