@@ -181,7 +181,7 @@ func (s *Server) AddNamespace(ns NameSpace, refRoot, refObjects bool) int {
 		o0.refs = append(o0.refs, no.refs...)
 	}
 
-	return len(s.namespaces)
+	return len(s.namespaces) - 1
 }
 
 func (s *Server) Endpoints() []*ua.EndpointDescription {

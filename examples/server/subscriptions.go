@@ -227,13 +227,15 @@ func (ns *MapNamespace) Node(id *ua.NodeID) *server.Node {
 func (ns *MapNamespace) Objects() *server.Node {
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
 	eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
-	reftype := ua.NewNumericNodeID(0, id.Organizes) // folder
+	reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
 	n := server.NewNode(
 		oid,
 		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:   ua.MustVariant(uint32(ua.NodeClassObject)),
-			ua.AttributeIDBrowseName:  ua.MustVariant(attrs.BrowseName(ns.name)),
-			ua.AttributeIDDisplayName: ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
+			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(ns.name)),
+			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
+			ua.AttributeIDDescription:   ua.MustVariant(""),
+			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
 		},
 		[]*ua.ReferenceDescription{{
 			ReferenceTypeID: reftype,

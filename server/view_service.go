@@ -54,45 +54,11 @@ func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request, reqID uint32)
 			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBad}
 			continue
 		}
-		if br.NodeID.IntID() == id.ObjectsFolder && br.NodeID.Namespace() == 0 {
-			//resp.Results[i] = getFakeObjects()
-			//resp.Results[i] = s.srv.namespaces[1].Browse(br)
-			resp.Results[i] = ns.Browse(br)
-		} else {
-			resp.Results[i] = ns.Browse(br)
-		}
+		resp.Results[i] = ns.Browse(br)
 	}
 
 	return resp, nil
 
-}
-
-func getFakeObjects() *ua.BrowseResult {
-	refs := make([]*ua.ReferenceDescription, 1)
-
-	key := "ImAnObjectHarry"
-	myid := uint32(85)
-	ns := uint16(1)
-
-	//newid := ua.NewNumericNodeID(ns, myid)
-	expnewid := ua.NewNumericExpandedNodeID(ns, myid)
-
-	reftype := ua.NewNumericNodeID(0, id.Organizes) // folder
-
-	refs[0] = &ua.ReferenceDescription{
-		ReferenceTypeID: reftype,
-		IsForward:       true,
-		NodeID:          expnewid,
-		BrowseName:      &ua.QualifiedName{NamespaceIndex: ns, Name: key},
-		DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: key},
-		NodeClass:       ua.NodeClassObject,
-		TypeDefinition:  expnewid,
-	}
-
-	return &ua.BrowseResult{
-		StatusCode: ua.StatusGood,
-		References: refs,
-	}
 }
 
 func (s *ViewService) suitableRef(desc *ua.BrowseDescription, ref *ua.ReferenceDescription) bool {

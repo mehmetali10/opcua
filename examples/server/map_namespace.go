@@ -223,11 +223,30 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 
 	if n.IntID() != 0 {
 		// this is not one of our normal tags.
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadNodeIDInvalid,
+		if n.IntID() != id.ObjectsFolder {
+			return &ua.DataValue{
+				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+				ServerTimestamp: time.Now(),
+				Status:          ua.StatusBadNodeIDInvalid,
+			}
 		}
+
+		attrval, err := ns.Objects().Attribute(a)
+		if err != nil {
+			return &ua.DataValue{
+				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+				ServerTimestamp: time.Now(),
+				Status:          ua.StatusBadAttributeIDInvalid,
+			}
+		}
+
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode | ua.DataValueValue,
+			ServerTimestamp: time.Now(),
+			Status:          ua.StatusOK,
+			Value:           attrval.Value,
+		}
+
 	}
 
 	dv := &ua.DataValue{
