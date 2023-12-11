@@ -227,6 +227,7 @@ func (ns *MapNamespace) Node(id *ua.NodeID) *server.Node {
 func (ns *MapNamespace) Objects() *server.Node {
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
 	eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
+	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
 	reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
 	n := server.NewNode(
 		oid,
@@ -244,7 +245,7 @@ func (ns *MapNamespace) Objects() *server.Node {
 			BrowseName:      &ua.QualifiedName{NamespaceIndex: ns.ID(), Name: ns.name},
 			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: ns.name},
 			NodeClass:       ua.NodeClassObject,
-			TypeDefinition:  eoid,
+			TypeDefinition:  typedef,
 		}},
 		nil,
 	)
