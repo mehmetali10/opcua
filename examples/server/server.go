@@ -74,6 +74,7 @@ func main() {
 	s := server.New(*endpoint, opts...)
 
 	mrw := NewMapNamespace("MyTestNamespace")
+	mrw2 := NewMapNamespace("SomeOtherNamespace")
 
 	num := 42
 
@@ -82,6 +83,12 @@ func main() {
 	mrw.Data["Tag3.Tag4"] = "some string"
 	mrw.Data["Tag5"] = true
 	mrw.Data["Tag6"] = time.Now()
+
+	mrw2.Data["Tag7"] = 56.78
+	mrw2.Data["Tag8"] = 92
+	mrw2.Data["Tag9"] = "different string"
+	mrw2.Data["Tag10"] = false
+	mrw2.Data["Tag11"] = time.Now().Add(time.Hour)
 
 	// some background process updating the map
 	go func() {
@@ -95,7 +102,7 @@ func main() {
 	}()
 
 	// register our custom read handler.
-	s.RegisterHandler(id.ReadRequest_Encoding_DefaultBinary, mrw.CustomRead)
+	//s.RegisterHandler(id.ReadRequest_Encoding_DefaultBinary, mrw.CustomRead)
 	s.RegisterHandler(id.WriteRequest_Encoding_DefaultBinary, mrw.CustomWrite)
 	//s.RegisterHandler(id.BrowseRequest_Encoding_DefaultBinary, mrw.CustomBrowse)
 
@@ -103,7 +110,9 @@ func main() {
 	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, mrw.Publish)
 	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, mrw.CreateMonitoredItems)
 
-	mrw_id := s.AddNamespace(&mrw)
+	//mrw_id := s.AddNamespace(mrw, false, true)
+	//log.Printf("map namespace added at index %d", mrw_id)
+	mrw_id := s.AddNamespace(mrw2, false, true)
 	log.Printf("map namespace added at index %d", mrw_id)
 
 	if err := s.Start(context.Background()); err != nil {
@@ -119,16 +128,3 @@ func main() {
 	<-sigch
 	log.Printf("Shutting down the server...")
 }
-
-// when first attempting to read a tag it tries to create a subscription request.
-//
-//    0000   f0 d4 15 92 21 f1 be 80 ad fa 06 f6 08 00 45 00   ....!.........E.
-//    0010   00 88 9d 80 40 00 40 06 16 b6 c0 a8 02 a7 c0 a8   ....@.@.........
-//    0020   02 42 a2 74 12 e8 eb e2 00 65 9f 69 33 be 80 18   .B.t.....e.i3...
-//    0030   01 f5 55 0c 00 00 01 01 08 0a ed ff 66 61 14 ce   ..U.........fa..
-//    0040   09 00 4d 53 47 46 54 00 00 00 75 0e 1f 24 0d 31   ..MSGFT...u..$.1
-//    0050   f8 39 0e 00 00 00 0e 00 00 00 01 00 13 03 02 00   .9..............
-//    0060   00 f2 d0 a9 5f 10 60 f7 b5 7f 22 da 01 0c 00 00   ...._.`...".....
-//    0070   00 00 00 00 00 ff ff ff ff 60 ea 00 00 00 00 00   .........`......
-//    0080   00 00 00 00 00 40 7f 40 b0 04 00 00 78 00 00 00   .....@.@....x...
-//    0090   ff ff 00 00 01 00                                 ......

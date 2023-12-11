@@ -227,7 +227,7 @@ func (ns *MapNamespace) Node(id *ua.NodeID) *server.Node {
 func (ns *MapNamespace) Objects() *server.Node {
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
 	eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
-	reftype := ua.NewNumericNodeID(ns.ID(), id.Organizes) // folder
+	reftype := ua.NewNumericNodeID(0, id.Organizes) // folder
 	n := server.NewNode(
 		oid,
 		map[ua.AttributeID]*ua.Variant{

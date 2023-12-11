@@ -6,6 +6,7 @@ package server
 
 import (
 	"sync"
+	"time"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -29,6 +30,7 @@ type NameSpace interface {
 	Browse(req *ua.BrowseDescription) *ua.BrowseResult
 	ID() uint16
 	SetID(uint16)
+	Attribute(*ua.NodeID, ua.AttributeID) *ua.DataValue
 }
 
 // the base "node-centric" namespace
@@ -67,12 +69,30 @@ func (as *NodeNameSpace) AddNode(n *Node) *Node {
 	return nn
 }
 
-func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) (*AttrValue, error) {
+func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
 	n := as.Node(id)
 	if n == nil {
-		return nil, ua.StatusBadNodeIDUnknown
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+			ServerTimestamp: time.Now(),
+			Status:          ua.StatusBadNodeIDUnknown,
+		}
 	}
-	return n.Attribute(attr)
+
+	a, err := n.Attribute(attr)
+	if err != nil {
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+			ServerTimestamp: time.Now(),
+			Status:          ua.StatusBadAttributeIDInvalid,
+		}
+	}
+	return &ua.DataValue{
+		EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+		ServerTimestamp: time.Now(),
+		Status:          ua.StatusBadNodeIDInvalid,
+		Value:           a.Value,
+	}
 }
 
 func (as *NodeNameSpace) Node(id *ua.NodeID) *Node {

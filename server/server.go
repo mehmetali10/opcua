@@ -146,7 +146,13 @@ func (s *Server) Namespaces() []NameSpace {
 	return s.namespaces
 }
 
-func (s *Server) AddNamespace(ns NameSpace) int {
+// for now, the address space of the server is split up into namespaces.
+// this means that when we look up a node, we need to ask the specific namespace
+// it belongs to for it instead of just a general lookup by ID
+//
+// the refRoot and refObjects flags can be used to automatically add a reference to the new Namespaces
+// root or objects object respectively to the namespace 0
+func (s *Server) AddNamespace(ns NameSpace, refRoot, refObjects bool) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if idx := slices.Index(s.namespaces, ns); idx >= 0 {
@@ -160,18 +166,20 @@ func (s *Server) AddNamespace(ns NameSpace) int {
 
 	}
 
-	// add the root of the new namespace to the global root.
 	ns0 := s.namespaces[0]
-	r0 := ns0.Root()
-	nr := ns.Root()
-	//r0.AddObject(nr)
-	r0.refs = append(r0.refs, nr.refs...)
+	// add a reference from namespace 0 root to the new namespaces root.
+	if refRoot {
+		r0 := ns0.Root()
+		nr := ns.Root()
+		r0.refs = append(r0.refs, nr.refs...)
+	}
 
-	o0 := ns0.Objects()
-	no := ns.Objects()
-	//o0.AddObject(no)
-
-	o0.refs = append(r0.refs, no.refs...)
+	// add a reference from namespace 0 objects to the new namespace objects object
+	if refObjects {
+		o0 := ns0.Objects()
+		no := ns.Objects()
+		o0.refs = append(o0.refs, no.refs...)
+	}
 
 	return len(s.namespaces)
 }

@@ -28,40 +28,17 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint
 	for i, n := range req.NodesToRead {
 		debug.Printf("read: node=%s attr=%s", n.NodeID, n.AttributeID)
 
-		dv := &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp,
-			ServerTimestamp: time.Now(),
-		}
-
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {
-			return &ua.ReadResponse{
-				ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBad),
-			}, err
+			results[i] = &ua.DataValue{
+				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+				ServerTimestamp: time.Now(),
+				Status:          ua.StatusBad,
+			}
+			continue
 		}
-		v, err := ns.Node(n.NodeID).Attribute(n.AttributeID)
-		switch x := err.(type) {
-		case nil:
-			dv.EncodingMask |= ua.DataValueStatusCode | ua.DataValueValue
-			dv.Status = ua.StatusOK
-			dv.Value = v.Value
+		results[i] = ns.Attribute(n.NodeID, n.AttributeID)
 
-		case ua.StatusCode:
-			dv.EncodingMask |= ua.DataValueStatusCode
-			dv.Status = x
-
-		default:
-			debug.Printf("read: node=%s attr=%s err=%s", n.NodeID, n.AttributeID, err)
-			dv.EncodingMask |= ua.DataValueStatusCode
-			dv.Status = ua.StatusBadInternalError
-		}
-
-		if v != nil && !v.SourceTimestamp.IsZero() {
-			dv.EncodingMask |= ua.DataValueSourceTimestamp
-			dv.SourceTimestamp = v.SourceTimestamp
-		}
-
-		results[i] = dv
 	}
 
 	response := &ua.ReadResponse{
