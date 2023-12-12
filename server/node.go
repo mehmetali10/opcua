@@ -88,6 +88,20 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 		return nil, ua.StatusBadAttributeIDInvalid
 	}
 }
+func (n *Node) SetAttribute(id ua.AttributeID, val ua.DataValue) error {
+	switch {
+	case id == ua.AttributeIDValue:
+
+		// TODO: probably need to do some type checking here.
+		// And some permissions tests
+		n.val = func() *ua.Variant {
+			return ua.MustVariant(val.Value.Value())
+		}
+
+		return nil
+	}
+	return ua.StatusBadNodeAttributesInvalid
+}
 
 func (n *Node) BrowseName() *ua.QualifiedName {
 	v := n.attr[ua.AttributeIDBrowseName]

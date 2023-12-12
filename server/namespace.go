@@ -31,6 +31,7 @@ type NameSpace interface {
 	ID() uint16
 	SetID(uint16)
 	Attribute(*ua.NodeID, ua.AttributeID) *ua.DataValue
+	SetAttribute(*ua.NodeID, ua.AttributeID, *ua.DataValue) ua.StatusCode
 }
 
 // the base "node-centric" namespace
@@ -162,4 +163,17 @@ func (ns *NodeNameSpace) ID() uint16 {
 
 func (ns *NodeNameSpace) SetID(id uint16) {
 	ns.id = id
+}
+func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+	n := as.Node(id)
+	if n == nil {
+		return ua.StatusBadNodeIDUnknown
+	}
+
+	err := n.SetAttribute(attr, *val)
+	if err != nil {
+		return ua.StatusBadAttributeIDInvalid
+	}
+
+	return ua.StatusOK
 }

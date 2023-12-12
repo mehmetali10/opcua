@@ -166,46 +166,6 @@ func safeReq[T ua.Request](r ua.Request) (T, error) {
 	return req, nil
 }
 
-func (s *MapNamespace) CustomWrite(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-
-	req, err := safeReq[*ua.WriteRequest](r)
-	if err != nil {
-		return nil, err
-	}
-
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
-
-	status := ua.StatusBad
-
-	for _, n := range req.NodesToWrite {
-		debug.Printf("write: node=%s attr=%s", n.NodeID, n.AttributeID)
-		key := strip_crap(n.NodeID.String())
-
-		// we would normally look up the node in our actual address space, but since that's dumb, we're just
-		// going to use the node id directly to look it up from our data map.
-		if n.AttributeID == ua.AttributeIDValue {
-			v := n.Value.Value.Value()
-			s.Data[key] = v
-			status = ua.StatusOK
-			debug.Printf("write: key=%s value=%s", key, v)
-		}
-
-	}
-	response := &ua.ReadResponse{
-		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
-			RequestHandle:      req.RequestHeader.RequestHandle,
-			ServiceResult:      status,
-			ServiceDiagnostics: &ua.DiagnosticInfo{},
-			StringTable:        []string{},
-			AdditionalHeader:   ua.NewExtensionObject(nil),
-		},
-	}
-
-	return response, nil
-}
-
 func strip_crap(s string) string {
 	seq_pos := strings.LastIndex(s, "s=")
 	if seq_pos < 0 {
@@ -265,4 +225,22 @@ func (ns *MapNamespace) Root() *server.Node {
 	)
 	return n
 
+}
+
+func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	log.Printf("'%s' Data pre-write: %v", s.name, s.Data)
+
+	key := strip_crap(node.StringID())
+
+	// we would normally look up the node in our actual address space, but since that's dumb, we're just
+	// going to use the node id directly to look it up from our data map.
+	if attr == ua.AttributeIDValue {
+		v := val.Value.Value()
+		s.Data[key] = v
+	}
+
+	return ua.StatusOK
 }

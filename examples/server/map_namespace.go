@@ -158,12 +158,6 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 	defer ns.Mu.RUnlock()
 
 	debug.Printf("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
-	// nodes igniton tried to browse:
-	//
-	//OPCBinarySchema_TypeSystem
-	//BaseDataType
-	//ObjectsFolder
-	//Server_ServerStatus_State id# 2259 - this appears to be a keepalive / status kind of thing.  doesn't seem to actually matter
 	//
 	log.Printf("Browse req for %s", bd.NodeID.String())
 	if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
@@ -258,6 +252,7 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	key := strip_crap(n.String())
 	log.Printf("Read req for %s", key)
 	var err error
+	log.Printf("'%s' Data at read: %v", ns.name, ns.Data)
 
 	// we are going to use the node id directly to look it up from our data map.
 	if a == ua.AttributeIDValue {

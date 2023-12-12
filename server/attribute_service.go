@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -62,13 +63,41 @@ func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request, req
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
 func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	debug.Printf("Handling %T", r)
 
 	req, err := safeReq[*ua.WriteRequest](r)
 	if err != nil {
 		return nil, err
 	}
-	return serviceUnsupported(req.RequestHeader), nil
+
+	status := make([]ua.StatusCode, len(req.NodesToWrite))
+
+	for i := range req.NodesToWrite {
+		n := req.NodesToWrite[i]
+		log.Printf("write: node=%s attr=%v", n.NodeID, n.AttributeID)
+
+		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
+		if err != nil {
+			status[i] = ua.StatusBadNodeNotInView
+		}
+
+		status[i] = ns.SetAttribute(n.NodeID, n.AttributeID, n.Value)
+
+	}
+	response := &ua.WriteResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      req.RequestHeader.RequestHandle,
+			ServiceResult:      ua.StatusOK,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		Results:         status,
+		DiagnosticInfos: []*ua.DiagnosticInfo{},
+	}
+
+	return response, nil
+
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
