@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -6,97 +6,91 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
 
-type MapReadWriterSub struct {
-	MapReadWriter             *MapNamespace
+type PubReq struct {
+	// The data of the publish request
+	Req *ua.PublishRequest
+
+	// The request ID (from the header) of the publish request.  This has to be used when replying.
+	ID uint32
+}
+
+type MonitoredItem struct {
+}
+
+type Subscription struct {
+	srv                       Server
 	ID                        uint32
 	RevisedPublishingInterval float64
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
-	Tags                      map[uint32]string
-	TagListLock               sync.Mutex
+	ReadValueList             map[uint32]ua.ReadValueID
+	ReadValueLock             sync.Mutex
 	Channel                   *uasc.SecureChannel
 	SequenceID                uint32
 	SeqNums                   map[uint32]struct{}
 }
 
-func NewMapReadWriterSub() *MapReadWriterSub {
-	return &MapReadWriterSub{
-		Tags:    map[uint32]string{},
-		SeqNums: map[uint32]struct{}{},
+func NewSubscription() *Subscription {
+	return &Subscription{
+		ReadValueList: map[uint32]ua.ReadValueID{},
+		SeqNums:       map[uint32]struct{}{},
 	}
 }
 
-func (s *MapReadWriterSub) Start() {
+func (s *Subscription) Start() {
 	go s.run()
 
 }
 
 // this function should be run as a go-routine and will handle sending data out
 // to the client at the correct rate assuming there are publish requests queued up.
-func (s *MapReadWriterSub) run() {
+// This is the simplest possible subscription logic where we don't check if a value was changed
+// or rely on some other event notification method.  We just send the values at the subscription rate
+func (s *Subscription) run() {
 	for {
 		// wait for the publish interval
 		time.Sleep(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
-		s.TagListLock.Lock()
-		l := len(s.Tags)
-		s.TagListLock.Unlock()
+		s.ReadValueLock.Lock()
+		l := len(s.ReadValueList)
+		s.ReadValueLock.Unlock()
 		if l == 0 {
 			log.Print("No tags in sub list")
 			continue
 		}
 		log.Printf("Waiting for publish req on sub #%d", s.ID)
-		pubreq := <-s.MapReadWriter.PublishRequests
+		pubreq := <-s.srv.PublishRequests
 		// see if we have any tags
 		s.SequenceID++
 		log.Printf("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
 		// then get all the tags and send them back to the client
 
-		vals := make([]*ua.MonitoredItemNotification, len(s.Tags))
-		s.TagListLock.Lock()
-		log.Printf("Responding with %d elements: %v", len(s.Tags), s.Tags)
-		for i := range s.Tags {
+		vals := make([]*ua.MonitoredItemNotification, len(s.ReadValueList))
+		s.ReadValueLock.Lock()
+		log.Printf("Responding with %d elements: %v", len(s.ReadValueList), s.ReadValueList)
+		for i := range s.ReadValueList {
+			rv := s.ReadValueList[i]
+			ns, err := s.srv.Namespace(int(rv.NodeID.Namespace()))
 			vals[i] = new(ua.MonitoredItemNotification)
-			key := s.Tags[i]
-			v := s.MapReadWriter.Data[key]
-			dv := new(ua.DataValue)
-			switch tv := v.(type) {
-			case string:
-				dv.Value = ua.MustVariant(tv)
-			case int:
-				// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
-				// have to worry about cutting data off.
-				dv.Value = ua.MustVariant(int64(tv))
-			case int32:
-				dv.Value = ua.MustVariant(tv)
-			case float32:
-				dv.Value = ua.MustVariant(tv)
-			case float64:
-				dv.Value = ua.MustVariant(tv)
-			case bool:
-				dv.Value = ua.MustVariant(tv)
-			default:
-				dv.Value = ua.MustVariant(tv)
+			if err != nil {
+				log.Printf("error getting namespace %d: %v", rv.NodeID.Namespace(), err)
+				vals[i].Value = &ua.DataValue{}
+				vals[i].Value.Status = ua.StatusBad
+				vals[i].Value.EncodingMask |= ua.DataValueStatusCode
 			}
-			dv.EncodingMask |= ua.DataValueStatusCode
-			dv.Status = ua.StatusOK
-			dv.EncodingMask |= ua.DataValueSourceTimestamp
-			dv.SourceTimestamp = time.Now()
-			dv.EncodingMask |= ua.DataValueValue
+			dv := ns.Attribute(rv.NodeID, rv.AttributeID)
 			vals[i].ClientHandle = i
 			vals[i].Value = dv
-			log.Printf("Value: %v", dv.Value.Value())
 		}
 		for x := range pubreq.Req.SubscriptionAcknowledgements {
 			a := pubreq.Req.SubscriptionAcknowledgements[x]
 			delete(s.SeqNums, a.SequenceNumber)
 		}
 		log.Printf("values: %v", *vals[0])
-		s.TagListLock.Unlock()
+		s.ReadValueLock.Unlock()
 		dcn := ua.DataChangeNotification{
 			MonitoredItems:  vals,
 			DiagnosticInfos: []*ua.DiagnosticInfo{},
@@ -145,14 +139,4 @@ func (s *MapReadWriterSub) run() {
 		log.Printf("Publish OK for %d", s.ID)
 		// wait till we've got a publish request.
 	}
-}
-
-func safeReq[T ua.Request](r ua.Request) (T, error) {
-	var t T
-	req, ok := r.(T)
-	if !ok {
-		debug.Printf("expected %T, got %T", t, r)
-		return t, ua.StatusBadRequestTypeInvalid
-	}
-	return req, nil
 }

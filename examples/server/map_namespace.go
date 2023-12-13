@@ -3,11 +3,14 @@ package main
 import (
 	"errors"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/server"
+	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -17,7 +20,7 @@ type MapNamespace struct {
 	Mu              sync.RWMutex
 	Data            map[string]any
 	Subs            map[uint32]*MapReadWriterSub
-	PublishRequests chan PubReq
+	PublishRequests chan server.PubReq
 
 	id uint16
 }
@@ -26,7 +29,7 @@ func NewMapNamespace(name string) *MapNamespace {
 	mrw := MapNamespace{}
 	mrw.name = name
 	mrw.Subs = make(map[uint32]*MapReadWriterSub)
-	mrw.PublishRequests = make(chan PubReq, 100)
+	mrw.PublishRequests = make(chan server.PubReq, 100)
 	mrw.Data = make(map[string]any)
 	return &mrw
 }
@@ -84,7 +87,7 @@ func (s *MapNamespace) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint3
 	}
 
 	select {
-	case s.PublishRequests <- PubReq{Req: req, ID: reqID}:
+	case s.PublishRequests <- server.PubReq{Req: req, ID: reqID}:
 	default:
 		log.Printf("Too many publish reqs.")
 	}
@@ -365,4 +368,83 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	debug.Printf("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
 
 	return dv
+}
+
+func strip_crap(s string) string {
+	seq_pos := strings.LastIndex(s, "s=")
+	if seq_pos < 0 {
+		return s
+	}
+	return s[seq_pos+2:]
+}
+
+func (ns *MapNamespace) Name() string {
+	return ns.name
+}
+func (ns *MapNamespace) AddNode(n *server.Node) *server.Node {
+	return n
+}
+func (ns *MapNamespace) Node(id *ua.NodeID) *server.Node {
+	return nil
+
+}
+func (ns *MapNamespace) Objects() *server.Node {
+	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
+	eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
+	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
+	reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
+	n := server.NewNode(
+		oid,
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(ns.name)),
+			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
+			ua.AttributeIDDescription:   ua.MustVariant(""),
+			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		},
+		[]*ua.ReferenceDescription{{
+			ReferenceTypeID: reftype,
+			IsForward:       true,
+			NodeID:          eoid,
+			BrowseName:      &ua.QualifiedName{NamespaceIndex: ns.ID(), Name: ns.name},
+			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: ns.name},
+			NodeClass:       ua.NodeClassObject,
+			TypeDefinition:  typedef,
+		}},
+		nil,
+	)
+	return n
+
+}
+func (ns *MapNamespace) Root() *server.Node {
+	n := server.NewNode(
+		ua.NewNumericNodeID(ns.ID(), id.RootFolder),
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDNodeClass:   ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:  ua.MustVariant(attrs.BrowseName("Root")),
+			ua.AttributeIDDisplayName: ua.MustVariant(attrs.DisplayName("Root", "")),
+		},
+		[]*ua.ReferenceDescription{},
+		nil,
+	)
+	return n
+
+}
+
+func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	log.Printf("'%s' Data pre-write: %v", s.name, s.Data)
+
+	key := strip_crap(node.StringID())
+
+	// we would normally look up the node in our actual address space, but since that's dumb, we're just
+	// going to use the node id directly to look it up from our data map.
+	if attr == ua.AttributeIDValue {
+		v := val.Value.Value()
+		s.Data[key] = v
+	}
+
+	return ua.StatusOK
 }

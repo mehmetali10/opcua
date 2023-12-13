@@ -46,6 +46,9 @@ type Server struct {
 	// Service Handlers are methods called to respond to service requests from clients
 	// All services should have a method here.
 	handlers map[uint16]Handler
+
+	// pub sub stuff
+	PublishRequests chan PubReq
 }
 
 type serverConfig struct {
