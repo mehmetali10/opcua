@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"log"
 	"strings"
 	"sync"
@@ -12,15 +11,12 @@ import (
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/uasc"
 )
 
 type MapNamespace struct {
-	name            string
-	Mu              sync.RWMutex
-	Data            map[string]any
-	Subs            map[uint32]*MapReadWriterSub
-	PublishRequests chan server.PubReq
+	name string
+	Mu   sync.RWMutex
+	Data map[string]any
 
 	id uint16
 }
@@ -28,125 +24,8 @@ type MapNamespace struct {
 func NewMapNamespace(name string) *MapNamespace {
 	mrw := MapNamespace{}
 	mrw.name = name
-	mrw.Subs = make(map[uint32]*MapReadWriterSub)
-	mrw.PublishRequests = make(chan server.PubReq, 100)
 	mrw.Data = make(map[string]any)
 	return &mrw
-}
-
-func (s *MapNamespace) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	debug.Printf("Handling %T", r)
-
-	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
-	if err != nil {
-		return nil, err
-	}
-
-	newsubid := uint32(len(s.Subs) + 5)
-
-	log.Printf("Create Sub %d", newsubid)
-
-	sub := MapReadWriterSub{
-		MapReadWriter:             s,
-		Channel:                   sc,
-		ID:                        newsubid,
-		RevisedPublishingInterval: req.RequestedPublishingInterval,
-		RevisedLifetimeCount:      req.RequestedLifetimeCount,
-		RevisedMaxKeepAliveCount:  req.RequestedMaxKeepAliveCount,
-		SeqNums:                   make(map[uint32]struct{}),
-	}
-	s.Subs[newsubid] = &sub
-	sub.Start()
-
-	resp := &ua.CreateSubscriptionResponse{
-		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
-			RequestHandle:      req.RequestHeader.RequestHandle,
-			ServiceResult:      ua.StatusOK,
-			ServiceDiagnostics: &ua.DiagnosticInfo{},
-			StringTable:        []string{},
-			AdditionalHeader:   ua.NewExtensionObject(nil),
-		},
-		SubscriptionID:            uint32(newsubid),
-		RevisedPublishingInterval: req.RequestedPublishingInterval,
-		RevisedLifetimeCount:      req.RequestedLifetimeCount,
-		RevisedMaxKeepAliveCount:  req.RequestedMaxKeepAliveCount,
-	}
-	return resp, nil
-}
-
-//PublishRequest_Encoding_DefaultBinary
-
-func (s *MapNamespace) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	log.Printf("Raw Publish req")
-
-	req, err := safeReq[*ua.PublishRequest](r)
-	if err != nil {
-		log.Printf("ERROR: bad PublishRequest Struct")
-		return nil, err
-	}
-
-	select {
-	case s.PublishRequests <- server.PubReq{Req: req, ID: reqID}:
-	default:
-		log.Printf("Too many publish reqs.")
-	}
-
-	return nil, nil
-}
-
-func (s *MapNamespace) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	debug.Printf("Handling %T", r)
-
-	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
-	if err != nil {
-		return nil, err
-	}
-
-	count := len(req.ItemsToCreate)
-
-	res := make([]*ua.MonitoredItemCreateResult, count)
-
-	subID := req.SubscriptionID
-	log.Printf("Creating monitored items for sub #%d", subID)
-	_, ok := s.Subs[subID]
-	if !ok {
-		return nil, errors.New("sub doesn't exist")
-	}
-	s.Subs[subID].TagListLock.Lock()
-	s.Subs[subID].Tags = make(map[uint32]string)
-	for i := range req.ItemsToCreate {
-		item := req.ItemsToCreate[i]
-		monitored_key := item.ItemToMonitor.NodeID.String()
-		monitored_key = strip_crap(monitored_key)
-		log.Printf("Adding monitored item '%s' to sub #%d as %d", monitored_key, subID, item.RequestedParameters.ClientHandle)
-		s.Subs[subID].Tags[item.RequestedParameters.ClientHandle] = monitored_key
-		res[i] = &ua.MonitoredItemCreateResult{
-			StatusCode:              ua.StatusOK,
-			MonitoredItemID:         uint32(i),
-			RevisedSamplingInterval: s.Subs[subID].RevisedPublishingInterval,
-			RevisedQueueSize:        1,
-			FilterResult:            ua.NewExtensionObject(nil),
-		}
-
-	}
-	s.Subs[subID].TagListLock.Unlock()
-
-	resp := &ua.CreateMonitoredItemsResponse{
-		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
-			RequestHandle:      req.RequestHeader.RequestHandle,
-			ServiceResult:      ua.StatusOK,
-			ServiceDiagnostics: &ua.DiagnosticInfo{},
-			StringTable:        []string{},
-			AdditionalHeader:   ua.NewExtensionObject(nil),
-		},
-		Results:         res,                    //                  []StatusCode
-		DiagnosticInfos: []*ua.DiagnosticInfo{}, //          []*DiagnosticInfo
-	}
-
-	return resp, nil
-
 }
 
 func (s *MapNamespace) ID() uint16 {

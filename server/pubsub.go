@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -22,12 +24,12 @@ type MonitoredItem struct {
 }
 
 type Subscription struct {
-	srv                       Server
+	srv                       *Server
 	ID                        uint32
 	RevisedPublishingInterval float64
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
-	ReadValueList             map[uint32]ua.ReadValueID
+	ReadValueList             map[uint32]*ua.ReadValueID
 	ReadValueLock             sync.Mutex
 	Channel                   *uasc.SecureChannel
 	SequenceID                uint32
@@ -36,7 +38,7 @@ type Subscription struct {
 
 func NewSubscription() *Subscription {
 	return &Subscription{
-		ReadValueList: map[uint32]ua.ReadValueID{},
+		ReadValueList: map[uint32]*ua.ReadValueID{},
 		SeqNums:       map[uint32]struct{}{},
 	}
 }
@@ -139,4 +141,117 @@ func (s *Subscription) run() {
 		log.Printf("Publish OK for %d", s.ID)
 		// wait till we've got a publish request.
 	}
+}
+
+func (s *Server) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	debug.Printf("Handling %T", r)
+
+	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
+	if err != nil {
+		return nil, err
+	}
+
+	newsubid := uint32(len(s.Subs))
+
+	log.Printf("Create Sub %d", newsubid)
+
+	sub := Subscription{
+		srv:                       s,
+		Channel:                   sc,
+		ID:                        newsubid,
+		RevisedPublishingInterval: req.RequestedPublishingInterval,
+		RevisedLifetimeCount:      req.RequestedLifetimeCount,
+		RevisedMaxKeepAliveCount:  req.RequestedMaxKeepAliveCount,
+		SeqNums:                   make(map[uint32]struct{}),
+		ReadValueList:             make(map[uint32]*ua.ReadValueID),
+	}
+	s.Subs[newsubid] = &sub
+	sub.Start()
+
+	resp := &ua.CreateSubscriptionResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      req.RequestHeader.RequestHandle,
+			ServiceResult:      ua.StatusOK,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		SubscriptionID:            uint32(newsubid),
+		RevisedPublishingInterval: req.RequestedPublishingInterval,
+		RevisedLifetimeCount:      req.RequestedLifetimeCount,
+		RevisedMaxKeepAliveCount:  req.RequestedMaxKeepAliveCount,
+	}
+	return resp, nil
+}
+
+//PublishRequest_Encoding_DefaultBinary
+
+func (s *Server) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	log.Printf("Raw Publish req")
+
+	req, err := safeReq[*ua.PublishRequest](r)
+	if err != nil {
+		log.Printf("ERROR: bad PublishRequest Struct")
+		return nil, err
+	}
+
+	select {
+	case s.PublishRequests <- PubReq{Req: req, ID: reqID}:
+	default:
+		log.Printf("Too many publish reqs.")
+	}
+
+	return nil, nil
+}
+
+func (s *Server) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	debug.Printf("Handling %T", r)
+
+	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
+	if err != nil {
+		return nil, err
+	}
+
+	count := len(req.ItemsToCreate)
+
+	res := make([]*ua.MonitoredItemCreateResult, count)
+
+	subID := req.SubscriptionID
+	log.Printf("Creating monitored items for sub #%d", subID)
+	_, ok := s.Subs[subID]
+	if !ok {
+		return nil, errors.New("sub doesn't exist")
+	}
+	s.Subs[subID].ReadValueLock.Lock()
+	defer s.Subs[subID].ReadValueLock.Unlock()
+	for i := range req.ItemsToCreate {
+		item := req.ItemsToCreate[i]
+		log.Printf("Adding monitored item '%s' to sub #%d as %d", item.ItemToMonitor.NodeID.String(), subID, item.RequestedParameters.ClientHandle)
+		s.Subs[subID].ReadValueList[item.RequestedParameters.ClientHandle] = item.ItemToMonitor
+		res[i] = &ua.MonitoredItemCreateResult{
+			StatusCode:              ua.StatusOK,
+			MonitoredItemID:         uint32(i),
+			RevisedSamplingInterval: s.Subs[subID].RevisedPublishingInterval,
+			RevisedQueueSize:        1,
+			FilterResult:            ua.NewExtensionObject(nil),
+		}
+
+	}
+
+	resp := &ua.CreateMonitoredItemsResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      req.RequestHeader.RequestHandle,
+			ServiceResult:      ua.StatusOK,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		Results:         res,                    //                  []StatusCode
+		DiagnosticInfos: []*ua.DiagnosticInfo{}, //          []*DiagnosticInfo
+	}
+
+	return resp, nil
+
 }

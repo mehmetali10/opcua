@@ -49,6 +49,8 @@ type Server struct {
 
 	// pub sub stuff
 	PublishRequests chan PubReq
+	Subs            map[uint32]*Subscription
+	SubsLock        sync.RWMutex
 }
 
 type serverConfig struct {
@@ -118,6 +120,8 @@ func New(url string, opts ...Option) *Server {
 			SecondsTillShutdown: 0,
 			ShutdownReason:      &ua.LocalizedText{},
 		},
+		Subs:            make(map[uint32]*Subscription),
+		PublishRequests: make(chan PubReq, 100),
 	}
 
 	// init server address space

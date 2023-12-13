@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/ua"
 )
@@ -106,9 +105,9 @@ func main() {
 	//s.RegisterHandler(id.WriteRequest_Encoding_DefaultBinary, mrw.CustomWrite)
 	//s.RegisterHandler(id.BrowseRequest_Encoding_DefaultBinary, mrw.CustomBrowse)
 
-	s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, mrw.CreateSubscription)
-	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, mrw.Publish)
-	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, mrw.CreateMonitoredItems)
+	//s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, mrw.CreateSubscription)
+	//s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, mrw.Publish)
+	//s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, mrw.CreateMonitoredItems)
 
 	mrw_id := s.AddNamespace(mrw, false, true)
 	log.Printf("map namespace added at index %d", mrw_id)

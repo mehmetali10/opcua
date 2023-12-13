@@ -65,7 +65,8 @@ func (s *Server) initHandlers() {
 
 	item := &MonitoredItemService{s}
 	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreate)
-	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, item.CreateMonitoredItems)
+	//s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, item.CreateMonitoredItems)
+	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, s.CreateMonitoredItems)
 	// s.registerHandler(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, item.MonitoredItemModify)
 	s.RegisterHandler(id.ModifyMonitoredItemsRequest_Encoding_DefaultBinary, item.ModifyMonitoredItems)
 	s.RegisterHandler(id.SetMonitoringModeRequest_Encoding_DefaultBinary, item.SetMonitoringMode)
@@ -73,10 +74,12 @@ func (s *Server) initHandlers() {
 	s.RegisterHandler(id.DeleteMonitoredItemsRequest_Encoding_DefaultBinary, item.DeleteMonitoredItems)
 
 	sub := &SubscriptionService{s}
-	s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)
+	//s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)
+	s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, s.CreateSubscription)
 	s.RegisterHandler(id.ModifySubscriptionRequest_Encoding_DefaultBinary, sub.ModifySubscription)
 	s.RegisterHandler(id.SetPublishingModeRequest_Encoding_DefaultBinary, sub.SetPublishingMode)
-	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, sub.Publish)
+	//s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, sub.Publish)
+	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, s.Publish)
 	s.RegisterHandler(id.RepublishRequest_Encoding_DefaultBinary, sub.Republish)
 	s.RegisterHandler(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, sub.TransferSubscriptions)
 	s.RegisterHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, sub.DeleteSubscriptions)
