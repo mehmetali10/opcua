@@ -81,6 +81,7 @@ func (s *Server) initHandlers() {
 		SubService: sub,
 		Items:      make(map[uint32]*MonitoredItem),
 		Nodes:      make(map[string][]*MonitoredItem),
+		Subs:       make(map[uint32][]*MonitoredItem),
 	}
 	s.MonitoredItemService = item
 	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreate)

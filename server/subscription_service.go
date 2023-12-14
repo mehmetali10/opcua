@@ -50,17 +50,15 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 	log.Printf("Create Sub %d", newsubid)
 
-	sub := Subscription{
-		srv:                       s,
-		Channel:                   sc,
-		ID:                        newsubid,
-		RevisedPublishingInterval: req.RequestedPublishingInterval,
-		RevisedLifetimeCount:      req.RequestedLifetimeCount,
-		RevisedMaxKeepAliveCount:  req.RequestedMaxKeepAliveCount,
-		SeqNums:                   make(map[uint32]struct{}),
-		NotifyChannel:             make(chan *ua.MonitoredItemNotification),
-	}
-	s.Subs[newsubid] = &sub
+	sub := NewSubscription()
+	sub.srv = s
+	sub.Channel = sc
+	sub.ID = newsubid
+	sub.RevisedPublishingInterval = req.RequestedPublishingInterval
+	sub.RevisedLifetimeCount = req.RequestedLifetimeCount
+	sub.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
+
+	s.Subs[newsubid] = sub
 	sub.Start()
 
 	resp := &ua.CreateSubscriptionResponse{
@@ -198,13 +196,20 @@ type Subscription struct {
 	T                         *time.Ticker
 
 	NotifyChannel chan *ua.MonitoredItemNotification
+	ModifyChannel chan *ua.ModifySubscriptionRequest
 }
 
 func NewSubscription() *Subscription {
 	return &Subscription{
 		SeqNums:       map[uint32]struct{}{},
 		NotifyChannel: make(chan *ua.MonitoredItemNotification, 100),
+		ModifyChannel: make(chan *ua.ModifySubscriptionRequest, 2),
 	}
+}
+func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
+	s.RevisedPublishingInterval = req.RequestedPublishingInterval
+	s.RevisedLifetimeCount = req.RequestedLifetimeCount
+	s.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 }
 
 func (s *Subscription) Start() {
@@ -218,12 +223,29 @@ func (s *Subscription) run() {
 	// if this go routine dies, we need to delete ourselves.
 	defer s.srv.DeleteSubscription(s.ID)
 
+	missed_publish_intervals := 0
+	//TODO: if a sub is modified, this ticker time may need to change.
 	s.T = time.NewTicker(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
 	for {
 		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
 		publishQueue := make(map[uint32]*ua.MonitoredItemNotification)
 		// TODO: this should also monitor <-s.T.C and if it comes up we should send a keepalive?
-		publishQueue[0] = <-s.NotifyChannel
+	L0:
+		for {
+			select {
+			case newNotification := <-s.NotifyChannel:
+				publishQueue[newNotification.ClientHandle] = newNotification
+				break L0
+			case <-s.T.C:
+				missed_publish_intervals++
+				if missed_publish_intervals > int(s.RevisedMaxKeepAliveCount) {
+					missed_publish_intervals = 0
+					//TODO: keepalive
+				}
+			case update := <-s.ModifyChannel:
+				s.Update(update)
+			}
+		}
 		// collect monitored item notifications
 		var pubreq PubReq
 	L1:
@@ -235,9 +257,18 @@ func (s *Subscription) run() {
 				// once we get a publish request, we should move on to publish them back
 				log.Printf("Got publish request.")
 				break L1
+			case <-s.T.C:
+				missed_publish_intervals++
+				if missed_publish_intervals > int(s.RevisedMaxKeepAliveCount) {
+					missed_publish_intervals = 0
+					//TODO: keepalive
+				}
 			}
 		}
 		// now we need to continue to collect notifications until we've reached our publishing interval
+		// we can reset the missed intervals because at this point we're sure to publish as soon as the
+		// ticker ticks.
+		missed_publish_intervals = 0
 	L2:
 		for {
 			select {

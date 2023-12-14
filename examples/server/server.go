@@ -93,6 +93,7 @@ func main() {
 	updates := 0
 	// some background process updating the map
 	go func() {
+		time.Sleep(time.Second * 10)
 		for {
 			updates++
 			num++
