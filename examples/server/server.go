@@ -76,6 +76,7 @@ func main() {
 	mrw2 := NewMapNamespace("SomeOtherNamespace")
 
 	num := 42
+	tag5 := true
 
 	mrw.Data["Tag1"] = 123.4
 	mrw.Data["Tag2"] = 42
@@ -89,12 +90,21 @@ func main() {
 	mrw2.Data["Tag10"] = false
 	mrw2.Data["Tag11"] = time.Now().Add(time.Hour)
 
+	updates := 0
 	// some background process updating the map
 	go func() {
 		for {
+			updates++
 			num++
 			mrw.Mu.Lock()
 			mrw.Data["Tag2"] = num
+			s.ChangeNotification(ua.NewStringNodeID(mrw.ID(), "Tag2"))
+			if updates == 10 {
+				tag5 = !tag5
+				mrw.Data["Tag5"] = tag5
+				s.ChangeNotification(ua.NewStringNodeID(mrw.ID(), "Tag5"))
+				updates = 0
+			}
 			mrw.Mu.Unlock()
 			time.Sleep(time.Second)
 		}

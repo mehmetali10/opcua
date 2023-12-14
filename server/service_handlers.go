@@ -63,26 +63,34 @@ func (s *Server) initHandlers() {
 	// s.registerHandler(id.CallMethodRequest_Encoding_DefaultBinary, method.CallMethod) // todo(fs): I think this is bogus
 	s.RegisterHandler(id.CallRequest_Encoding_DefaultBinary, method.Call)
 
-	item := &MonitoredItemService{s}
+	sub := &SubscriptionService{
+		srv:             s,
+		Subs:            make(map[uint32]*Subscription),
+		PublishRequests: make(chan PubReq, 100),
+	}
+	s.SubscriptionService = sub
+	s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)
+	s.RegisterHandler(id.ModifySubscriptionRequest_Encoding_DefaultBinary, sub.ModifySubscription)
+	s.RegisterHandler(id.SetPublishingModeRequest_Encoding_DefaultBinary, sub.SetPublishingMode)
+	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, sub.Publish)
+	s.RegisterHandler(id.RepublishRequest_Encoding_DefaultBinary, sub.Republish)
+	s.RegisterHandler(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, sub.TransferSubscriptions)
+	s.RegisterHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, sub.DeleteSubscriptions)
+
+	item := &MonitoredItemService{
+		Subs:  sub,
+		Items: make(map[uint32]*MonitoredItem),
+		Nodes: make(map[string][]*MonitoredItem),
+	}
+	s.MonitoredItemService = item
 	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreate)
-	//s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, item.CreateMonitoredItems)
-	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, s.CreateMonitoredItems)
+	s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, item.CreateMonitoredItems)
+	//s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, s.CreateMonitoredItems)
 	// s.registerHandler(id.MonitoredItemModifyRequest_Encoding_DefaultBinary, item.MonitoredItemModify)
 	s.RegisterHandler(id.ModifyMonitoredItemsRequest_Encoding_DefaultBinary, item.ModifyMonitoredItems)
 	s.RegisterHandler(id.SetMonitoringModeRequest_Encoding_DefaultBinary, item.SetMonitoringMode)
 	s.RegisterHandler(id.SetTriggeringRequest_Encoding_DefaultBinary, item.SetTriggering)
 	s.RegisterHandler(id.DeleteMonitoredItemsRequest_Encoding_DefaultBinary, item.DeleteMonitoredItems)
-
-	sub := &SubscriptionService{s}
-	//s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)
-	s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, s.CreateSubscription)
-	s.RegisterHandler(id.ModifySubscriptionRequest_Encoding_DefaultBinary, sub.ModifySubscription)
-	s.RegisterHandler(id.SetPublishingModeRequest_Encoding_DefaultBinary, sub.SetPublishingMode)
-	//s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, sub.Publish)
-	s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, s.Publish)
-	s.RegisterHandler(id.RepublishRequest_Encoding_DefaultBinary, sub.Republish)
-	s.RegisterHandler(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, sub.TransferSubscriptions)
-	s.RegisterHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, sub.DeleteSubscriptions)
 }
 
 // This function allows you to overwrite a handler before you call start.

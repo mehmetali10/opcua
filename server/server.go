@@ -47,10 +47,8 @@ type Server struct {
 	// All services should have a method here.
 	handlers map[uint16]Handler
 
-	// pub sub stuff
-	PublishRequests chan PubReq
-	Subs            map[uint32]*Subscription
-	SubsLock        sync.RWMutex
+	SubscriptionService  *SubscriptionService
+	MonitoredItemService *MonitoredItemService
 }
 
 type serverConfig struct {
@@ -120,8 +118,6 @@ func New(url string, opts ...Option) *Server {
 			SecondsTillShutdown: 0,
 			ShutdownReason:      &ua.LocalizedText{},
 		},
-		Subs:            make(map[uint32]*Subscription),
-		PublishRequests: make(chan PubReq, 100),
 	}
 
 	// init server address space
@@ -151,6 +147,10 @@ func (s *Server) Namespaces() []NameSpace {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.namespaces
+}
+
+func (s *Server) ChangeNotification(n *ua.NodeID) {
+	s.MonitoredItemService.ChangeNotification(n)
 }
 
 // for now, the address space of the server is split up into namespaces.
