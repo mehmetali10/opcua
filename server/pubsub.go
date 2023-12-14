@@ -45,9 +45,10 @@ func (s *Subscription) Start() {
 
 // this function should be run as a go-routine and will handle sending data out
 // to the client at the correct rate assuming there are publish requests queued up.
-// This is the simplest possible subscription logic where we don't check if a value was changed
-// or rely on some other event notification method.  We just send the values at the subscription rate
 func (s *Subscription) run() {
+	// if this go routine dies, we need to delete ourselves.
+	defer s.srv.DeleteSubscription(s.ID)
+
 	s.T = time.NewTicker(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
 	for {
 		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
@@ -79,7 +80,6 @@ func (s *Subscription) run() {
 			}
 		}
 
-		// see if we have any tags
 		s.SequenceID++
 		log.Printf("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
 		// then get all the tags and send them back to the client

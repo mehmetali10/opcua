@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -16,7 +17,20 @@ type SubscriptionService struct {
 	srv *Server
 	// pub sub stuff
 	PublishRequests chan PubReq
+	Mu              sync.Mutex
 	Subs            map[uint32]*Subscription
+}
+
+// get rid of all references to a subscription and all monitored items that are pointed at this subscription.
+func (s *SubscriptionService) DeleteSubscription(id uint32) {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+
+	delete(s.Subs, id)
+
+	// ask the monitored item service to purge out any items that use this subscription
+	s.srv.MonitoredItemService.DeleteSub(id)
+
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
@@ -27,6 +41,9 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 	if err != nil {
 		return nil, err
 	}
+
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
 
 	newsubid := uint32(len(s.Subs))
 
@@ -100,6 +117,8 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 		log.Printf("Too many publish reqs.")
 	}
 
+	// per opcua spec, we don't respond now.  When data is available on the subscription,
+	// the Subscription will respond in the background.
 	return nil, nil
 }
 
@@ -133,5 +152,22 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 	if err != nil {
 		return nil, err
 	}
-	return serviceUnsupported(req.RequestHeader), nil
+
+	results := make([]ua.StatusCode, len(req.SubscriptionIDs))
+	for i := range req.SubscriptionIDs {
+		s.DeleteSubscription(req.SubscriptionIDs[i])
+		results[i] = ua.StatusOK
+	}
+	return &ua.DeleteSubscriptionsResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      req.RequestHeader.RequestHandle,
+			ServiceResult:      ua.StatusOK,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		Results:         results,                //                  []StatusCode
+		DiagnosticInfos: []*ua.DiagnosticInfo{}, //          []*DiagnosticInfo
+	}, nil
 }

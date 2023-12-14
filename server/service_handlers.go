@@ -78,9 +78,9 @@ func (s *Server) initHandlers() {
 	s.RegisterHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, sub.DeleteSubscriptions)
 
 	item := &MonitoredItemService{
-		Subs:  sub,
-		Items: make(map[uint32]*MonitoredItem),
-		Nodes: make(map[string][]*MonitoredItem),
+		SubService: sub,
+		Items:      make(map[uint32]*MonitoredItem),
+		Nodes:      make(map[string][]*MonitoredItem),
 	}
 	s.MonitoredItemService = item
 	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreate)
