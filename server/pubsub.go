@@ -51,13 +51,13 @@ func (s *Subscription) run() {
 	s.T = time.NewTicker(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
 	for {
 		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
-		//TODO: timeout and send a keepalive if we don't get anything.
 		s.publishQueue = make([]*ua.MonitoredItemNotification, 1, 32)
 		s.publishQueue[0] = <-s.NotifyChannel
 		// collect monitored item notifications
 		var pubreq PubReq
 	L1:
 		for {
+			// TODO: this select should also monitor <-s.T.C and if it comes up we should send a keepalive?
 			select {
 			case newNotification := <-s.NotifyChannel:
 				s.publishQueue = append(s.publishQueue, newNotification)
