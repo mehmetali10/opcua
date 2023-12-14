@@ -6,6 +6,8 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
+	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/server/refs"
 	"github.com/gopcua/opcua/ua"
 )
@@ -37,6 +39,79 @@ type Node struct {
 func NewNode(id *ua.NodeID, attr Attributes, refs References, val ValueFunc) *Node {
 	n := &Node{id, attr, refs, val, nil}
 	n.sanitize()
+	return n
+}
+
+func NewFolderNode(nodeID *ua.NodeID, name string) *Node {
+	reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
+	eoid := ua.NewNumericExpandedNodeID(nodeID.Namespace(), id.ObjectsFolder)
+	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
+	n := NewNode(
+		nodeID,
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(name)),
+			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(name, name)),
+			ua.AttributeIDDescription:   ua.MustVariant(""),
+			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		},
+		[]*ua.ReferenceDescription{{
+			ReferenceTypeID: reftype,
+			IsForward:       true,
+			NodeID:          eoid,
+			BrowseName:      &ua.QualifiedName{NamespaceIndex: nodeID.Namespace(), Name: name},
+			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: name},
+			NodeClass:       ua.NodeClassObject,
+			TypeDefinition:  typedef,
+		}},
+		nil,
+	)
+	return n
+}
+
+func NewVariableNode(nodeID *ua.NodeID, name string, value any) *Node {
+	var reftype *ua.NodeID
+	switch value.(type) {
+	case string:
+		reftype = ua.NewNumericNodeID(0, 12)
+	case int:
+		reftype = ua.NewNumericNodeID(0, 6)
+	case int32:
+		reftype = ua.NewNumericNodeID(0, 6)
+	case float32:
+		reftype = ua.NewNumericNodeID(0, 10)
+	case float64:
+		reftype = ua.NewNumericNodeID(0, 11)
+	case bool:
+		reftype = ua.NewNumericNodeID(0, 1)
+	default:
+		reftype = ua.NewNumericNodeID(0, 24)
+	}
+
+	eoid := ua.NewNumericExpandedNodeID(nodeID.Namespace(), nodeID.IntID())
+	typedef := ua.NewNumericExpandedNodeID(0, id.VariableNode)
+	n := NewNode(
+		nodeID,
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassVariable)),
+			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(name)),
+			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(name, name)),
+			ua.AttributeIDDescription:   ua.MustVariant(""),
+			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		},
+		[]*ua.ReferenceDescription{{
+			ReferenceTypeID: reftype,
+			IsForward:       true,
+			NodeID:          eoid,
+			BrowseName:      &ua.QualifiedName{NamespaceIndex: nodeID.Namespace(), Name: name},
+			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: name},
+			NodeClass:       ua.NodeClassObject,
+			TypeDefinition:  typedef,
+		}},
+		func() *ua.Variant {
+			return ua.MustVariant(value)
+		},
+	)
 	return n
 }
 
@@ -187,4 +262,20 @@ func (n *Node) AddVariable(o *Node) *Node {
 	nn.SetNodeClass(ua.NodeClassVariable)
 	n.refs = append(n.refs, refs.Organizes(nn.id, nn.BrowseName().Name, nn.DisplayName().Text, nn.DataType()))
 	return nn
+}
+
+func (n *Node) AddRef(o *Node) {
+	//eoid := ua.NewNumericExpandedNodeID(o.ns.ID(), o.)
+	eoid := ua.NewExpandedNodeID(o.ID(), "", 0)
+
+	ref := ua.ReferenceDescription{
+		ReferenceTypeID: o.refs[0].ReferenceTypeID,
+		IsForward:       true,
+		NodeID:          eoid,
+		BrowseName:      o.BrowseName(),
+		DisplayName:     o.DisplayName(),
+		NodeClass:       ua.NodeClassObject,
+		TypeDefinition:  o.DataType(),
+	}
+	n.refs = append(n.refs, &ref)
 }

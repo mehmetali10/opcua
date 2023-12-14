@@ -134,6 +134,16 @@ func main() {
 	signal.Notify(sigch, os.Interrupt)
 	defer signal.Stop(sigch)
 
+	nodeNS := server.NewNodeNameSpace(s, "NodeNamespace")
+	var1 := nodeNS.AddNewVariableNode("TestVar1", float32(123.45))
+	nns_obj := nodeNS.Objects()
+	nns_obj.AddRef(var1)
+	root_ns, _ := s.Namespace(0)
+	root_obj := root_ns.Objects()
+	root_obj.AddRef(nns_obj)
+
+	s.AddNamespace(nodeNS, false, true)
+
 	log.Printf("Press CTRL-C to exit")
 	<-sigch
 	log.Printf("Shutting down the server...")

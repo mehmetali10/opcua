@@ -6,6 +6,7 @@ package server
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -57,11 +59,59 @@ type NameSpace interface {
 
 // the base "node-centric" namespace
 type NodeNameSpace struct {
-	name  string
-	mu    sync.RWMutex
-	nodes []*Node
-	m     map[string]*Node
-	id    uint16
+	name            string
+	mu              sync.RWMutex
+	nodes           []*Node
+	m               map[string]*Node
+	id              uint16
+	nodeid_sequence uint32
+}
+
+func (ns *NodeNameSpace) GetNextNodeID() uint32 {
+	if ns.nodeid_sequence < 100 {
+		ns.nodeid_sequence = 100
+	}
+	return atomic.AddUint32(&(ns.nodeid_sequence), 1)
+}
+
+func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
+	ns := &NodeNameSpace{
+		name:  name,
+		nodes: make([]*Node, 0),
+		m:     make(map[string]*Node),
+	}
+	srv.AddNamespace(ns, false, false)
+
+	//objectsNode := NewFolderNode(ua.NewNumericNodeID(ns.id, id.ObjectsFolder), ns.name)
+	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
+	eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
+	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
+	reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
+	objectsNode := NewNode(
+		oid,
+		map[ua.AttributeID]*ua.Variant{
+			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(ns.name)),
+			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
+			ua.AttributeIDDescription:   ua.MustVariant(""),
+			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		},
+		[]*ua.ReferenceDescription{{
+			ReferenceTypeID: reftype,
+			IsForward:       true,
+			NodeID:          eoid,
+			BrowseName:      &ua.QualifiedName{NamespaceIndex: ns.ID(), Name: ns.name},
+			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: ns.name},
+			NodeClass:       ua.NodeClassObject,
+			TypeDefinition:  typedef,
+		}},
+		nil,
+	)
+
+	ns.AddNode(objectsNode)
+
+	return ns
+
 }
 
 func (ns *NodeNameSpace) Name() string {
@@ -89,6 +139,12 @@ func (as *NodeNameSpace) AddNode(n *Node) *Node {
 	k := nn.ID().String()
 	as.m[k] = nn
 	return nn
+}
+
+func (as *NodeNameSpace) AddNewVariableNode(name string, value any) *Node {
+	n := NewVariableNode(ua.NewNumericNodeID(as.id, as.GetNextNodeID()), name, value)
+	as.AddNode(n)
+	return n
 }
 
 func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
@@ -132,7 +188,8 @@ func (as *NodeNameSpace) Node(id *ua.NodeID) *Node {
 }
 
 func (as *NodeNameSpace) Objects() *Node {
-	return as.Node(ObjectsFolder)
+	of := ua.NewNumericNodeID(as.id, id.ObjectsFolder)
+	return as.Node(of)
 }
 
 func (as *NodeNameSpace) Root() *Node {
