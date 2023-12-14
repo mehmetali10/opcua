@@ -181,6 +181,11 @@ type PubReq struct {
 	ID uint32
 }
 
+// This is the type that with its run() function will work in the bakground fullfilling subscription
+// publishes.
+//
+// MonitoredItems will send updates on the NotifyChannel to let the background task know that
+// an event has occured that needs to be published.
 type Subscription struct {
 	srv                       *SubscriptionService
 	ID                        uint32
@@ -193,12 +198,12 @@ type Subscription struct {
 	T                         *time.Ticker
 
 	NotifyChannel chan *ua.MonitoredItemNotification
-	publishQueue  []*ua.MonitoredItemNotification
 }
 
 func NewSubscription() *Subscription {
 	return &Subscription{
-		SeqNums: map[uint32]struct{}{},
+		SeqNums:       map[uint32]struct{}{},
+		NotifyChannel: make(chan *ua.MonitoredItemNotification, 100),
 	}
 }
 
@@ -216,16 +221,16 @@ func (s *Subscription) run() {
 	s.T = time.NewTicker(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
 	for {
 		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
-		s.publishQueue = make([]*ua.MonitoredItemNotification, 1, 32)
-		s.publishQueue[0] = <-s.NotifyChannel
+		publishQueue := make(map[uint32]*ua.MonitoredItemNotification)
+		// TODO: this should also monitor <-s.T.C and if it comes up we should send a keepalive?
+		publishQueue[0] = <-s.NotifyChannel
 		// collect monitored item notifications
 		var pubreq PubReq
 	L1:
 		for {
-			// TODO: this select should also monitor <-s.T.C and if it comes up we should send a keepalive?
 			select {
 			case newNotification := <-s.NotifyChannel:
-				s.publishQueue = append(s.publishQueue, newNotification)
+				publishQueue[newNotification.ClientHandle] = newNotification
 			case pubreq = <-s.srv.PublishRequests:
 				// once we get a publish request, we should move on to publish them back
 				log.Printf("Got publish request.")
@@ -237,7 +242,7 @@ func (s *Subscription) run() {
 		for {
 			select {
 			case newNotification := <-s.NotifyChannel:
-				s.publishQueue = append(s.publishQueue, newNotification)
+				publishQueue[newNotification.ClientHandle] = newNotification
 			case <-s.T.C:
 				// we've gone long enough that we can send
 				break L2
@@ -252,8 +257,16 @@ func (s *Subscription) run() {
 			a := pubreq.Req.SubscriptionAcknowledgements[x]
 			delete(s.SeqNums, a.SequenceNumber)
 		}
+
+		final_items := make([]*ua.MonitoredItemNotification, len(publishQueue))
+		i := 0
+		for k := range publishQueue {
+			final_items[i] = publishQueue[k]
+			i++
+		}
+
 		dcn := ua.DataChangeNotification{
-			MonitoredItems:  s.publishQueue,
+			MonitoredItems:  final_items,
 			DiagnosticInfos: []*ua.DiagnosticInfo{},
 		}
 		eo := make([]*ua.ExtensionObject, 1)
@@ -297,7 +310,7 @@ func (s *Subscription) run() {
 			log.Printf("Killing subscription %d", s.ID)
 			return
 		}
-		log.Printf("Published %d items OK for %d", len(s.publishQueue), s.ID)
+		log.Printf("Published %d items OK for %d", len(publishQueue), s.ID)
 		// wait till we've got a publish request.
 	}
 }
