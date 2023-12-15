@@ -169,6 +169,10 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 			RevisedQueueSize:        1,
 			FilterResult:            ua.NewExtensionObject(nil),
 		}
+		// do an initial update for the nodeids in the background.
+		// These lock the mutex so we can't do them inline here.
+		// This will cause them to happen once we unlock.
+		go s.ChangeNotification(nodeid)
 
 	}
 
