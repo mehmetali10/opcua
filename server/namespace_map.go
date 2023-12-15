@@ -208,7 +208,7 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	if a == ua.AttributeIDDescription {
 		dv.Status = ua.StatusOK
 		dv.EncodingMask |= ua.DataValueValue
-		dv.Value = ua.MustVariant("")
+		dv.Value = ua.MustVariant(&ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: ""})
 	}
 
 	if a == ua.AttributeIDBrowseName {
@@ -231,7 +231,7 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	if a == ua.AttributeIDNodeClass {
 		dv.Status = ua.StatusOK
 		dv.EncodingMask |= ua.DataValueValue
-		dv.Value = ua.MustVariant(uint32(ua.NodeClassVariable))
+		dv.Value = ua.MustVariant(int32(ua.NodeClassVariable))
 	}
 	// nothing in this namespace has event notifiers
 	if a == ua.AttributeIDEventNotifier {
@@ -354,7 +354,7 @@ func (ns *MapNamespace) Objects() *Node {
 	n := NewNode(
 		oid,
 		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDNodeClass:     ua.MustVariant(int32(ua.NodeClassObject)),
 			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(ns.name)),
 			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
 			ua.AttributeIDDescription:   ua.MustVariant(uint32(ua.NodeClassObject)),
@@ -371,7 +371,7 @@ func (ns *MapNamespace) Root() *Node {
 	n := NewNode(
 		ua.NewNumericNodeID(ns.ID(), id.RootFolder),
 		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:   ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDNodeClass:   ua.MustVariant(int32(ua.NodeClassObject)),
 			ua.AttributeIDBrowseName:  ua.MustVariant(attrs.BrowseName("Root")),
 			ua.AttributeIDDisplayName: ua.MustVariant(attrs.DisplayName("Root", "")),
 		},
