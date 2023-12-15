@@ -101,7 +101,7 @@ func main() {
 			// you can manually lock and change the value, then manually trigger the change notification
 			mrw.Mu.Lock()
 			mrw.Data["Tag2"] = num
-			s.ChangeNotification(ua.NewStringNodeID(mrw.ID(), "Tag2"))
+			mrw.ChangeNotification("Tag2")
 			mrw.Mu.Unlock()
 			if updates == 10 {
 				// or you can do it with the built-in functions.
@@ -111,6 +111,16 @@ func main() {
 				updates = 0
 			}
 			time.Sleep(time.Second)
+		}
+	}()
+
+	// simulate monitoring one of the namespaces for change events.
+	go func() {
+		for {
+			changed_key := <-mrw2.ExternalNotification
+			log.Printf("\n\n\n")
+			log.Printf("%s changed to %v", changed_key, mrw2.GetValue(changed_key))
+			log.Printf("\n\n\n")
 		}
 	}()
 

@@ -16,11 +16,17 @@ import (
 // without having to map your application data to the OCP-UA data abstraction
 //
 // It (currently) supports ints, floats, strings, and timestamps. No maps inside of maps and no arrays.
+//
+// To notify subscribers of changes, be sure to call ChangeNotification(key) after changing the value.
+// To be notified of changes from the opc-ua server to the map, receive on ExternalNotification channel
 type MapNamespace struct {
 	srv  *Server
 	name string
 	Mu   sync.RWMutex
 	Data map[string]any
+
+	// This can be used to be alerted when a value is changed from the opc server
+	ExternalNotification chan string
 
 	id uint16
 }
@@ -41,14 +47,22 @@ func (s *MapNamespace) SetValue(key string, value any) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 	s.Data[key] = value
+	s.ChangeNotification(key)
+}
+
+// This function is used to notify OPC UA subscribers if a key was changed without using the
+// SetValue() function
+func (s *MapNamespace) ChangeNotification(key string) {
 	s.srv.ChangeNotification(ua.NewStringNodeID(s.id, key))
 }
 
 func NewMapNamespace(srv *Server, name string) *MapNamespace {
-	mrw := MapNamespace{}
-	mrw.srv = srv
-	mrw.name = name
-	mrw.Data = make(map[string]any)
+	mrw := MapNamespace{
+		srv:                  srv,
+		name:                 name,
+		Data:                 make(map[string]any),
+		ExternalNotification: make(chan string),
+	}
 	return &mrw
 }
 
@@ -288,7 +302,13 @@ func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *u
 		s.Data[key] = v
 	}
 
+	// notify the opc ua server the value has changed.
 	s.srv.ChangeNotification(node)
+	// notify the non-opc application the value has changed.
+	select {
+	case s.ExternalNotification <- key:
+	default:
+	}
 
 	return ua.StatusOK
 }
