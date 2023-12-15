@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -98,9 +97,7 @@ func (as *NodeNameSpace) AddNode(n *Node) *Node {
 	// todo(fs): this is wrong since this leaves the old node in the list.
 	as.nodes = append(as.nodes, nn)
 	k := nn.ID().String()
-	if k == "i=2259" {
-		log.Printf("adding 2259")
-	}
+
 	as.m[k] = nn
 	return nn
 }
@@ -144,9 +141,7 @@ func (as *NodeNameSpace) Node(id *ua.NodeID) *Node {
 		return nil
 	}
 	k := id.String()
-	if k == "i=2259" {
-		log.Printf("looking up 2259")
-	}
+
 	n := as.m[k]
 	if n == nil {
 		return nil
