@@ -64,9 +64,8 @@ func (s *Server) initHandlers() {
 	s.RegisterHandler(id.CallRequest_Encoding_DefaultBinary, method.Call)
 
 	sub := &SubscriptionService{
-		srv:             s,
-		Subs:            make(map[uint32]*Subscription),
-		PublishRequests: make(chan PubReq, 100),
+		srv:  s,
+		Subs: make(map[uint32]*Subscription),
 	}
 	s.SubscriptionService = sub
 	s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)

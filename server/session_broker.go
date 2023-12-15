@@ -18,6 +18,8 @@ type session struct {
 	AuthTokenID       *ua.NodeID
 	serverNonce       []byte
 	remoteCertificate []byte
+
+	PublishRequests chan PubReq
 }
 
 type sessionConfig struct {
@@ -40,8 +42,9 @@ func newSessionBroker() *sessionBroker {
 
 func (sb *sessionBroker) NewSession() *session {
 	s := &session{
-		ID:          ua.NewGUIDNodeID(1, uuid.New().String()),
-		AuthTokenID: ua.NewNumericNodeID(0, uint32(mrand.Int31())),
+		ID:              ua.NewGUIDNodeID(1, uuid.New().String()),
+		AuthTokenID:     ua.NewNumericNodeID(0, uint32(mrand.Int31())),
+		PublishRequests: make(chan PubReq, 100),
 	}
 
 	sb.mu.Lock()

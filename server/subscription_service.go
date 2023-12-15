@@ -16,9 +16,8 @@ import (
 type SubscriptionService struct {
 	srv *Server
 	// pub sub stuff
-	PublishRequests chan PubReq
-	Mu              sync.Mutex
-	Subs            map[uint32]*Subscription
+	Mu   sync.Mutex
+	Subs map[uint32]*Subscription
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
@@ -51,6 +50,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 	sub := NewSubscription()
 	sub.srv = s
+	sub.Session = s.srv.Session(r.Header())
 	sub.Channel = sc
 	sub.ID = newsubid
 	sub.RevisedPublishingInterval = req.RequestedPublishingInterval
@@ -109,8 +109,10 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 		return nil, err
 	}
 
+	session := s.srv.Session(req.Header())
+
 	select {
-	case s.PublishRequests <- PubReq{Req: req, ID: reqID}:
+	case session.PublishRequests <- PubReq{Req: req, ID: reqID}:
 	default:
 		debug.Printf("Too many publish reqs.")
 	}
@@ -185,6 +187,7 @@ type PubReq struct {
 // an event has occured that needs to be published.
 type Subscription struct {
 	srv                       *SubscriptionService
+	Session                   *session
 	ID                        uint32
 	RevisedPublishingInterval float64
 	RevisedLifetimeCount      uint32
@@ -277,7 +280,7 @@ func (s *Subscription) run() {
 					if keepalive_counter > int(s.RevisedMaxKeepAliveCount) {
 						keepalive_counter = 0
 						select {
-						case pubreq := <-s.srv.PublishRequests:
+						case pubreq := <-s.Session.PublishRequests:
 							err := s.keepalive(pubreq)
 							if err != nil {
 								debug.Printf("problem sending keepalive: %v", err)
@@ -305,7 +308,7 @@ func (s *Subscription) run() {
 	L2:
 		for {
 			select {
-			case pubreq = <-s.srv.PublishRequests:
+			case pubreq = <-s.Session.PublishRequests:
 				// once we get a publish request, we should move on to publish them back
 				break L2
 			case newNotification := <-s.NotifyChannel:

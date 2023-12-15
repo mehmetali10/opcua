@@ -134,6 +134,10 @@ func New(url string, opts ...Option) *Server {
 	return s
 }
 
+func (s *Server) Session(hdr *ua.RequestHeader) *session {
+	return s.sb.Session(hdr.AuthenticationToken)
+}
+
 func (s *Server) Namespace(id int) (NameSpace, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
