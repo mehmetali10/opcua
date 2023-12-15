@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -79,7 +78,7 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 
 	debug.Printf("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
 	//
-	log.Printf("Browse req for %s", bd.NodeID.String())
+	debug.Printf("Browse req for %s", bd.NodeID.String())
 	if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
 
 		return &ua.BrowseResult{StatusCode: ua.StatusBadNodeIDUnknown}
@@ -133,7 +132,7 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 }
 
 func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
-	log.Printf("read: node=%s attr=%s", n.String(), a)
+	debug.Printf("read: node=%s attr=%s", n.String(), a)
 
 	if n.IntID() != 0 {
 		// this is not one of our normal tags.
@@ -170,9 +169,9 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	}
 
 	key := strip_crap(n.String())
-	log.Printf("Read req for %s", key)
+	debug.Printf("Read req for %s", key)
 	var err error
-	log.Printf("'%s' Data at read: %v", ns.name, ns.Data)
+	debug.Printf("'%s' Data at read: %v", ns.name, ns.Data)
 
 	// we are going to use the node id directly to look it up from our data map.
 	if a == ua.AttributeIDValue {
@@ -228,39 +227,39 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 		case string:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 12))
 			if err != nil {
-				log.Printf("problem creating variant: %v", err)
+				debug.Printf("problem creating variant: %v", err)
 			}
 		case int:
 			// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
 			// have to worry about cutting data off.
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				log.Printf("problem creating variant: %v", err)
+				debug.Printf("problem creating variant: %v", err)
 			}
 		case int32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				log.Printf("problem creating variant: %v", err)
+				debug.Printf("problem creating variant: %v", err)
 			}
 		case float32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 10))
 			if err != nil {
-				log.Printf("problem creating variant: %v", err)
+				debug.Printf("problem creating variant: %v", err)
 			}
 		case float64:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 11))
 			if err != nil {
-				log.Printf("problem creating variant: %v", err)
+				debug.Printf("problem creating variant: %v", err)
 			}
 		case bool:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 1))
 			if err != nil {
-				log.Printf("problem creating variant: %v", err)
+				debug.Printf("problem creating variant: %v", err)
 			}
 		default:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 24))
 			if err != nil {
-				log.Printf("problem creating variant: %v", err)
+				debug.Printf("problem creating variant: %v", err)
 			}
 		}
 	}
@@ -280,7 +279,7 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	}
 
 	if dv.Value == nil {
-		log.Printf("bad dv.Value!")
+		debug.Printf("bad dv.Value!")
 	}
 	debug.Printf("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
 
@@ -291,7 +290,7 @@ func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *u
 
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	log.Printf("'%s' Data pre-write: %v", s.name, s.Data)
+	debug.Printf("'%s' Data pre-write: %v", s.name, s.Data)
 
 	key := strip_crap(node.StringID())
 

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -73,7 +72,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 
 	for i := range req.NodesToWrite {
 		n := req.NodesToWrite[i]
-		log.Printf("write: node=%s attr=%v", n.NodeID, n.AttributeID)
+		debug.Printf("write: node=%s attr=%v", n.NodeID, n.AttributeID)
 
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {

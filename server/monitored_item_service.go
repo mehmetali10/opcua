@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"log"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -84,7 +83,7 @@ func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
 		val := new(ua.MonitoredItemNotification)
 		val.ClientHandle = item.Req.RequestedParameters.ClientHandle
 		if err != nil {
-			log.Printf("error getting namespace %d: %v", n.Namespace(), err)
+			debug.Printf("error getting namespace %d: %v", n.Namespace(), err)
 			val.Value = &ua.DataValue{}
 			val.Value.Status = ua.StatusBad
 			val.Value.EncodingMask |= ua.DataValueStatusCode
@@ -127,7 +126,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 	res := make([]*ua.MonitoredItemCreateResult, count)
 
 	subID := req.SubscriptionID
-	log.Printf("Creating monitored items for sub #%d", subID)
+	debug.Printf("Creating monitored items for sub #%d", subID)
 	s.SubService.Mu.Lock()
 	sub, ok := s.SubService.Subs[subID]
 	s.SubService.Mu.Unlock()
@@ -157,7 +156,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 		}
 		s.Subs[item.Sub.ID] = append(list, &item)
 
-		log.Printf("Adding monitored item '%s' to sub #%d as %d->%d",
+		debug.Printf("Adding monitored item '%s' to sub #%d as %d->%d",
 			nodeid.String(),
 			subID,
 			item.ID,

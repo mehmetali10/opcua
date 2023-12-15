@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -48,7 +47,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 	newsubid := uint32(len(s.Subs))
 
-	log.Printf("Create Sub %d", newsubid)
+	debug.Printf("Create Sub %d", newsubid)
 
 	sub := NewSubscription()
 	sub.srv = s
@@ -102,18 +101,18 @@ func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Req
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.5
 func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	log.Printf("Raw Publish req")
+	debug.Printf("Raw Publish req")
 
 	req, err := safeReq[*ua.PublishRequest](r)
 	if err != nil {
-		log.Printf("ERROR: bad PublishRequest Struct")
+		debug.Printf("ERROR: bad PublishRequest Struct")
 		return nil, err
 	}
 
 	select {
 	case s.PublishRequests <- PubReq{Req: req, ID: reqID}:
 	default:
-		log.Printf("Too many publish reqs.")
+		debug.Printf("Too many publish reqs.")
 	}
 
 	// per opcua spec, we don't respond now.  When data is available on the subscription,
@@ -192,8 +191,8 @@ type Subscription struct {
 	RevisedMaxKeepAliveCount  uint32
 	Channel                   *uasc.SecureChannel
 	SequenceID                uint32
-	SeqNums                   map[uint32]struct{}
-	T                         *time.Ticker
+	//SeqNums                   map[uint32]struct{}
+	T *time.Ticker
 
 	NotifyChannel chan *ua.MonitoredItemNotification
 	ModifyChannel chan *ua.ModifySubscriptionRequest
@@ -201,7 +200,7 @@ type Subscription struct {
 
 func NewSubscription() *Subscription {
 	return &Subscription{
-		SeqNums:       map[uint32]struct{}{},
+		//SeqNums:       map[uint32]struct{}{},
 		NotifyChannel: make(chan *ua.MonitoredItemNotification, 100),
 		ModifyChannel: make(chan *ua.ModifySubscriptionRequest, 2),
 	}
@@ -217,77 +216,125 @@ func (s *Subscription) Start() {
 
 }
 
+func (s *Subscription) keepalive(pubreq PubReq) error {
+	eo := make([]*ua.ExtensionObject, 0)
+
+	msg := ua.NotificationMessage{
+		SequenceNumber:   s.SequenceID,
+		PublishTime:      time.Now(),
+		NotificationData: eo,
+	}
+
+	response := &ua.PublishResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      pubreq.Req.RequestHeader.RequestHandle,
+			ServiceResult:      ua.StatusOK,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		SubscriptionID:           s.ID,
+		MoreNotifications:        false,
+		NotificationMessage:      &msg,
+		AvailableSequenceNumbers: []uint32{}, // an empty array indicates taht we don't support retransmission of messages
+		Results:                  []ua.StatusCode{},
+		DiagnosticInfos:          []*ua.DiagnosticInfo{},
+	}
+	err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // this function should be run as a go-routine and will handle sending data out
 // to the client at the correct rate assuming there are publish requests queued up.
+// if the function returns it deletes the subscription
 func (s *Subscription) run() {
 	// if this go routine dies, we need to delete ourselves.
 	defer s.srv.DeleteSubscription(s.ID)
 
-	missed_publish_intervals := 0
+	keepalive_counter := 0
+	lifetime_counter := 0
 	//TODO: if a sub is modified, this ticker time may need to change.
 	s.T = time.NewTicker(time.Millisecond * time.Duration(s.RevisedPublishingInterval))
 	for {
 		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
 		publishQueue := make(map[uint32]*ua.MonitoredItemNotification)
-		// TODO: this should also monitor <-s.T.C and if it comes up we should send a keepalive?
+
+		// Collect notifications until our publication interval is ready
 	L0:
 		for {
 			select {
 			case newNotification := <-s.NotifyChannel:
 				publishQueue[newNotification.ClientHandle] = newNotification
-				break L0
 			case <-s.T.C:
-				missed_publish_intervals++
-				if missed_publish_intervals > int(s.RevisedMaxKeepAliveCount) {
-					missed_publish_intervals = 0
-					//TODO: keepalive
+				if len(publishQueue) == 0 {
+					// nothing to publish, increment the keepalive counter and send a keepalive if it
+					// has been enough intervals.
+					keepalive_counter++
+					if keepalive_counter > int(s.RevisedMaxKeepAliveCount) {
+						keepalive_counter = 0
+						select {
+						case pubreq := <-s.srv.PublishRequests:
+							err := s.keepalive(pubreq)
+							if err != nil {
+								debug.Printf("problem sending keepalive: %v", err)
+								return
+							}
+						default:
+							lifetime_counter++
+							if lifetime_counter > int(s.RevisedLifetimeCount) {
+								debug.Printf("Subscription %d timed out.", s.ID)
+								return
+							}
+						}
+					}
+					continue // nothing to publish this interval
 				}
+				// we have things to publish so we'll break out to do that.
+				break L0
 			case update := <-s.ModifyChannel:
 				s.Update(update)
 			}
 		}
-		// collect monitored item notifications
 		var pubreq PubReq
-	L1:
-		for {
-			select {
-			case newNotification := <-s.NotifyChannel:
-				publishQueue[newNotification.ClientHandle] = newNotification
-			case pubreq = <-s.srv.PublishRequests:
-				// once we get a publish request, we should move on to publish them back
-				log.Printf("Got publish request.")
-				break L1
-			case <-s.T.C:
-				missed_publish_intervals++
-				if missed_publish_intervals > int(s.RevisedMaxKeepAliveCount) {
-					missed_publish_intervals = 0
-					//TODO: keepalive
-				}
-			}
-		}
-		// now we need to continue to collect notifications until we've reached our publishing interval
-		// we can reset the missed intervals because at this point we're sure to publish as soon as the
-		// ticker ticks.
-		missed_publish_intervals = 0
+
+		// now we need to continue to collect notifications until we've got a publish request
 	L2:
 		for {
 			select {
+			case pubreq = <-s.srv.PublishRequests:
+				// once we get a publish request, we should move on to publish them back
+				break L2
 			case newNotification := <-s.NotifyChannel:
 				publishQueue[newNotification.ClientHandle] = newNotification
+
 			case <-s.T.C:
-				// we've gone long enough that we can send
-				break L2
+				// we had another tick without a publish request.
+				lifetime_counter++
+				if lifetime_counter > int(s.RevisedLifetimeCount) {
+					debug.Printf("Subscription %d timed out.", s.ID)
+					return
+				}
 			}
 		}
+		lifetime_counter = 0
+		keepalive_counter = 0
 
 		s.SequenceID++
-		log.Printf("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
+		if s.SequenceID == 0 {
+			// per the spec, the sequence ID cannot be 0
+			s.SequenceID = 1
+		}
+		debug.Printf("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
 		// then get all the tags and send them back to the client
 
-		for x := range pubreq.Req.SubscriptionAcknowledgements {
-			a := pubreq.Req.SubscriptionAcknowledgements[x]
-			delete(s.SeqNums, a.SequenceNumber)
-		}
+		//for x := range pubreq.Req.SubscriptionAcknowledgements {
+		//a := pubreq.Req.SubscriptionAcknowledgements[x]
+		//delete(s.SeqNums, a.SequenceNumber)
+		//}
 
 		final_items := make([]*ua.MonitoredItemNotification, len(publishQueue))
 		i := 0
@@ -309,15 +356,7 @@ func (s *Subscription) run() {
 			PublishTime:      time.Now(),
 			NotificationData: eo,
 		}
-		s.SeqNums[s.SequenceID] = struct{}{}
-
-		seqnums := make([]uint32, len(s.SeqNums))
-		idx := 0
-		for i := range s.SeqNums {
-			seqnums[idx] = i
-			idx++
-		}
-		log.Printf("sequence numbers: %d", seqnums)
+		//s.SeqNums[s.SequenceID] = struct{}{}
 
 		response := &ua.PublishResponse{
 			ResponseHeader: &ua.ResponseHeader{
@@ -331,17 +370,17 @@ func (s *Subscription) run() {
 			SubscriptionID:           s.ID,
 			MoreNotifications:        false,
 			NotificationMessage:      &msg,
-			AvailableSequenceNumbers: seqnums,
+			AvailableSequenceNumbers: []uint32{}, // an empty array indicates taht we don't support retransmission of messages
 			Results:                  []ua.StatusCode{},
 			DiagnosticInfos:          []*ua.DiagnosticInfo{},
 		}
 		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
 		if err != nil {
-			log.Printf("problem sending channel response: %v", err)
-			log.Printf("Killing subscription %d", s.ID)
+			debug.Printf("problem sending channel response: %v", err)
+			debug.Printf("Killing subscription %d", s.ID)
 			return
 		}
-		log.Printf("Published %d items OK for %d", len(publishQueue), s.ID)
+		debug.Printf("Published %d items OK for %d", len(publishQueue), s.ID)
 		// wait till we've got a publish request.
 	}
 }

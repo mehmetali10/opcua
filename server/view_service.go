@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -30,7 +29,7 @@ func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request, reqID uint32)
 	if err != nil {
 		return nil, err
 	}
-	log.Print("=== Browse incoming")
+	debug.Printf("=== Browse incoming")
 
 	resp := &ua.BrowseResponse{
 		ResponseHeader: &ua.ResponseHeader{
@@ -48,7 +47,7 @@ func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request, reqID uint32)
 
 	for i := range req.NodesToBrowse {
 		br := req.NodesToBrowse[i]
-		log.Printf("    Browse of %s", br.NodeID.String())
+		debug.Printf("    Browse of %s", br.NodeID.String())
 		ns, err := s.srv.Namespace(int(br.NodeID.Namespace()))
 		if err != nil {
 			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBad}

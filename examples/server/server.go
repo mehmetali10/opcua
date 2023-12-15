@@ -118,9 +118,7 @@ func main() {
 	go func() {
 		for {
 			changed_key := <-mrw2.ExternalNotification
-			log.Printf("\n\n\n")
 			log.Printf("%s changed to %v", changed_key, mrw2.GetValue(changed_key))
-			log.Printf("\n\n\n")
 		}
 	}()
 
