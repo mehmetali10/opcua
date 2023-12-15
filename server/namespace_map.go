@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"log"
@@ -8,12 +8,16 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
 )
 
+// This namespaces give a convenient way to have data mapped to the OPC server
+// without having to map your application data to the OCP-UA data abstraction
+//
+// It (currently) supports ints, floats, strings, and timestamps. No maps inside of maps and no arrays.
 type MapNamespace struct {
+	srv  *Server
 	name string
 	Mu   sync.RWMutex
 	Data map[string]any
@@ -21,8 +25,28 @@ type MapNamespace struct {
 	id uint16
 }
 
-func NewMapNamespace(name string) *MapNamespace {
+// Get the value associated with key from the MapNamespace.
+// This function handles locking and getting the value.
+//
+// Returns nil if the value doesn't exist.
+func (s *MapNamespace) GetValue(key string) any {
+	s.Mu.RLock()
+	defer s.Mu.RUnlock()
+	return s.Data[key]
+}
+
+// update the value associated with a key and trigger the change notification
+// to the OPC server
+func (s *MapNamespace) SetValue(key string, value any) {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	s.Data[key] = value
+	s.srv.ChangeNotification(ua.NewStringNodeID(s.id, key))
+}
+
+func NewMapNamespace(srv *Server, name string) *MapNamespace {
 	mrw := MapNamespace{}
+	mrw.srv = srv
 	mrw.name = name
 	mrw.Data = make(map[string]any)
 	return &mrw
@@ -278,19 +302,19 @@ func strip_crap(s string) string {
 func (ns *MapNamespace) Name() string {
 	return ns.name
 }
-func (ns *MapNamespace) AddNode(n *server.Node) *server.Node {
+func (ns *MapNamespace) AddNode(n *Node) *Node {
 	return n
 }
-func (ns *MapNamespace) Node(id *ua.NodeID) *server.Node {
+func (ns *MapNamespace) Node(id *ua.NodeID) *Node {
 	return nil
 
 }
-func (ns *MapNamespace) Objects() *server.Node {
+func (ns *MapNamespace) Objects() *Node {
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
 	//eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
 	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
 	//reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
-	n := server.NewNode(
+	n := NewNode(
 		oid,
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
@@ -306,8 +330,8 @@ func (ns *MapNamespace) Objects() *server.Node {
 	return n
 
 }
-func (ns *MapNamespace) Root() *server.Node {
-	n := server.NewNode(
+func (ns *MapNamespace) Root() *Node {
+	n := NewNode(
 		ua.NewNumericNodeID(ns.ID(), id.RootFolder),
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDNodeClass:   ua.MustVariant(uint32(ua.NodeClassObject)),

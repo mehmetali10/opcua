@@ -73,8 +73,8 @@ func main() {
 	s := server.New(*endpoint, opts...)
 
 	// Create some namespaces backed by go map[string]any
-	mrw := NewMapNamespace("MyTestNamespace")
-	mrw2 := NewMapNamespace("SomeOtherNamespace")
+	mrw := server.NewMapNamespace(s, "MyTestNamespace")
+	mrw2 := server.NewMapNamespace(s, "SomeOtherNamespace")
 
 	// fill them with data.
 	mrw.Data["Tag1"] = 123.4
@@ -98,16 +98,18 @@ func main() {
 		for {
 			updates++
 			num++
+			// you can manually lock and change the value, then manually trigger the change notification
 			mrw.Mu.Lock()
 			mrw.Data["Tag2"] = num
 			s.ChangeNotification(ua.NewStringNodeID(mrw.ID(), "Tag2"))
+			mrw.Mu.Unlock()
 			if updates == 10 {
+				// or you can do it with the built-in functions.
+				// which handles the locking and triggering
 				tag5 = !tag5
-				mrw.Data["Tag5"] = tag5
-				s.ChangeNotification(ua.NewStringNodeID(mrw.ID(), "Tag5"))
+				mrw.SetValue("Tag5", tag5)
 				updates = 0
 			}
-			mrw.Mu.Unlock()
 			time.Sleep(time.Second)
 		}
 	}()
