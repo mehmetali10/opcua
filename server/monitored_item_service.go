@@ -133,6 +133,12 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 	if !ok {
 		return nil, errors.New("sub doesn't exist")
 	}
+
+	sess := s.SubService.srv.Session(req.RequestHeader)
+	if sub.Session.AuthTokenID.String() != sess.AuthTokenID.String() {
+		return nil, errors.New("not your subscription, bro")
+	}
+
 	for i := range req.ItemsToCreate {
 		itemreq := req.ItemsToCreate[i]
 		nodeid := itemreq.ItemToMonitor.NodeID
@@ -216,9 +222,16 @@ func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Re
 
 	results := make([]ua.StatusCode, len(req.MonitoredItemIDs))
 
+	sess := s.SubService.srv.Session(req.RequestHeader)
+
 	for i := range req.MonitoredItemIDs {
 		id := req.MonitoredItemIDs[i]
 		item, ok := s.Items[id]
+
+		if item.Sub.Session.AuthTokenID.String() != sess.AuthTokenID.String() {
+			results[i] = ua.StatusBadSessionIDInvalid
+		}
+
 		if !ok {
 			results[i] = ua.StatusBadMonitoredItemIDInvalid
 			continue
@@ -261,10 +274,26 @@ func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua
 	if err != nil {
 		return nil, err
 	}
+
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+
+	sess := s.SubService.srv.Session(req.RequestHeader)
+
 	results := make([]ua.StatusCode, len(req.MonitoredItemIDs))
 	for i := range req.MonitoredItemIDs {
 		id := req.MonitoredItemIDs[i]
-		s.DeleteMonitoredItem(id)
+		item, ok := s.Items[id]
+		if !ok {
+			results[i] = ua.StatusBadMonitoredItemIDInvalid
+		}
+
+		if item.Sub.Session.AuthTokenID.String() != sess.AuthTokenID.String() {
+			results[i] = ua.StatusBadSessionIDInvalid
+		}
+
+		// this function gets the lock so we need to do it in the background so it can happen after our lock is released.
+		go s.DeleteMonitoredItem(id)
 		results[i] = ua.StatusOK
 	}
 

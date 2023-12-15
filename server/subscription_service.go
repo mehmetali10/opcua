@@ -85,6 +85,9 @@ func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Re
 	if err != nil {
 		return nil, err
 	}
+
+	// When this gets implemented, be sure to check the subscription session vs the request session!
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
@@ -96,6 +99,7 @@ func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Req
 	if err != nil {
 		return nil, err
 	}
+	// When this gets implemented, be sure to check the subscription session vs the request session!
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
@@ -141,6 +145,7 @@ func (s *SubscriptionService) TransferSubscriptions(sc *uasc.SecureChannel, r ua
 	if err != nil {
 		return nil, err
 	}
+	// When this gets implemented, be sure to check the subscription session vs the request session!
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
@@ -152,10 +157,26 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 	if err != nil {
 		return nil, err
 	}
+	session := s.srv.Session(req.Header())
+
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
 
 	results := make([]ua.StatusCode, len(req.SubscriptionIDs))
 	for i := range req.SubscriptionIDs {
-		s.DeleteSubscription(req.SubscriptionIDs[i])
+		subid := req.SubscriptionIDs[i]
+		sub, ok := s.Subs[subid]
+		if !ok {
+			results[i] = ua.StatusBadSubscriptionIDInvalid
+			continue
+		}
+		if session.AuthTokenID.String() != sub.Session.AuthTokenID.String() {
+			results[i] = ua.StatusBadSessionIDInvalid
+			continue
+		}
+		// delete subscription gets the lock so we set them up to run in the background
+		// once this function releases its lock
+		go s.DeleteSubscription(subid)
 		results[i] = ua.StatusOK
 	}
 	return &ua.DeleteSubscriptionsResponse{
