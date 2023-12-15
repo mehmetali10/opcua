@@ -287,27 +287,20 @@ func (ns *MapNamespace) Node(id *ua.NodeID) *server.Node {
 }
 func (ns *MapNamespace) Objects() *server.Node {
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
-	eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
+	//eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
 	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
-	reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
+	//reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
 	n := server.NewNode(
 		oid,
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
 			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(ns.name)),
 			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
-			ua.AttributeIDDescription:   ua.MustVariant(""),
+			ua.AttributeIDDescription:   ua.MustVariant(uint32(ua.NodeClassObject)),
+			ua.AttributeIDDataType:      ua.MustVariant(typedef),
 			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
 		},
-		[]*ua.ReferenceDescription{{
-			ReferenceTypeID: reftype,
-			IsForward:       true,
-			NodeID:          eoid,
-			BrowseName:      &ua.QualifiedName{NamespaceIndex: ns.ID(), Name: ns.name},
-			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: ns.name},
-			NodeClass:       ua.NodeClassObject,
-			TypeDefinition:  typedef,
-		}},
+		[]*ua.ReferenceDescription{},
 		nil,
 	)
 	return n

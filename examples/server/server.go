@@ -111,18 +111,14 @@ func main() {
 		}
 	}()
 
-	// register our custom read handler.
-	//s.RegisterHandler(id.ReadRequest_Encoding_DefaultBinary, mrw.CustomRead)
-	//s.RegisterHandler(id.WriteRequest_Encoding_DefaultBinary, mrw.CustomWrite)
-	//s.RegisterHandler(id.BrowseRequest_Encoding_DefaultBinary, mrw.CustomBrowse)
+	root_ns, _ := s.Namespace(0)
+	root_obj := root_ns.Objects()
 
-	//s.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, mrw.CreateSubscription)
-	//s.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, mrw.Publish)
-	//s.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, mrw.CreateMonitoredItems)
-
-	mrw_id := s.AddNamespace(mrw, false, true)
+	mrw_id := s.AddNamespace(mrw)
+	root_obj.AddRef(mrw.Objects())
 	log.Printf("map namespace added at index %d", mrw_id)
-	mrw_id2 := s.AddNamespace(mrw2, false, true)
+	mrw_id2 := s.AddNamespace(mrw2)
+	root_obj.AddRef(mrw2.Objects())
 	log.Printf("map namespace added at index %d", mrw_id2)
 
 	if err := s.Start(context.Background()); err != nil {
@@ -135,14 +131,11 @@ func main() {
 	defer signal.Stop(sigch)
 
 	nodeNS := server.NewNodeNameSpace(s, "NodeNamespace")
+	s.AddNamespace(nodeNS)
 	var1 := nodeNS.AddNewVariableNode("TestVar1", float32(123.45))
 	nns_obj := nodeNS.Objects()
 	nns_obj.AddRef(var1)
-	root_ns, _ := s.Namespace(0)
-	root_obj := root_ns.Objects()
 	root_obj.AddRef(nns_obj)
-
-	s.AddNamespace(nodeNS, false, true)
 
 	log.Printf("Press CTRL-C to exit")
 	<-sigch

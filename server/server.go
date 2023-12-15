@@ -159,7 +159,7 @@ func (s *Server) ChangeNotification(n *ua.NodeID) {
 //
 // the refRoot and refObjects flags can be used to automatically add a reference to the new Namespaces
 // root or objects object respectively to the namespace 0
-func (s *Server) AddNamespace(ns NameSpace, refRoot, refObjects bool) int {
+func (s *Server) AddNamespace(ns NameSpace) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if idx := slices.Index(s.namespaces, ns); idx >= 0 {
@@ -171,21 +171,6 @@ func (s *Server) AddNamespace(ns NameSpace, refRoot, refObjects bool) int {
 	if ns.ID() == 0 {
 		return 0
 
-	}
-
-	ns0 := s.namespaces[0]
-	// add a reference from namespace 0 root to the new namespaces root.
-	if refRoot {
-		r0 := ns0.Root()
-		nr := ns.Root()
-		r0.refs = append(r0.refs, nr.refs...)
-	}
-
-	// add a reference from namespace 0 objects to the new namespace objects object
-	if refObjects {
-		o0 := ns0.Objects()
-		no := ns.Objects()
-		o0.refs = append(o0.refs, no.refs...)
 	}
 
 	return len(s.namespaces) - 1
