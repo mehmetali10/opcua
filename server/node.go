@@ -195,7 +195,9 @@ func (n *Node) DisplayName() *ua.LocalizedText {
 	if v == nil || v.Value() == nil {
 		return &ua.LocalizedText{}
 	}
-	return v.Value().(*ua.LocalizedText)
+	val := v.Value().(*ua.LocalizedText)
+	val.UpdateMask()
+	return val
 }
 
 func (n *Node) SetDisplayName(text, locale string) {

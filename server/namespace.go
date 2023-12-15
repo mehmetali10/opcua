@@ -84,9 +84,9 @@ func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
 
 	//objectsNode := NewFolderNode(ua.NewNumericNodeID(ns.id, id.ObjectsFolder), ns.name)
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
-	eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
-	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
-	reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
+	//eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
+	//typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
+	//reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
 	objectsNode := NewNode(
 		oid,
 		map[ua.AttributeID]*ua.Variant{
@@ -96,15 +96,7 @@ func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
 			ua.AttributeIDDescription:   ua.MustVariant(""),
 			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
 		},
-		[]*ua.ReferenceDescription{{
-			ReferenceTypeID: reftype,
-			IsForward:       true,
-			NodeID:          eoid,
-			BrowseName:      &ua.QualifiedName{NamespaceIndex: ns.ID(), Name: ns.name},
-			DisplayName:     &ua.LocalizedText{EncodingMask: ua.LocalizedTextText, Text: ns.name},
-			NodeClass:       ua.NodeClassObject,
-			TypeDefinition:  typedef,
-		}},
+		[]*ua.ReferenceDescription{},
 		nil,
 	)
 
