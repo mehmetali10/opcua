@@ -72,12 +72,11 @@ func main() {
 
 	s := server.New(*endpoint, opts...)
 
+	// Create some namespaces backed by go map[string]any
 	mrw := NewMapNamespace("MyTestNamespace")
 	mrw2 := NewMapNamespace("SomeOtherNamespace")
 
-	num := 42
-	tag5 := true
-
+	// fill them with data.
 	mrw.Data["Tag1"] = 123.4
 	mrw.Data["Tag2"] = 42
 	mrw.Data["Tag3.Tag4"] = "some string"
@@ -90,9 +89,11 @@ func main() {
 	mrw2.Data["Tag10"] = false
 	mrw2.Data["Tag11"] = time.Now().Add(time.Hour)
 
-	updates := 0
-	// some background process updating the map
+	// simulate a background process updating the map
 	go func() {
+		updates := 0
+		num := 42
+		tag5 := true
 		time.Sleep(time.Second * 10)
 		for {
 			updates++
@@ -111,6 +112,7 @@ func main() {
 		}
 	}()
 
+	// add the namespaces to the server, and add a reference to them
 	root_ns, _ := s.Namespace(0)
 	root_obj := root_ns.Objects()
 
@@ -121,6 +123,7 @@ func main() {
 	root_obj.AddRef(mrw2.Objects())
 	log.Printf("map namespace added at index %d", mrw_id2)
 
+	// Start the server
 	if err := s.Start(context.Background()); err != nil {
 		log.Fatalf("Error starting server, exiting: %s", err)
 	}
@@ -130,11 +133,17 @@ func main() {
 	signal.Notify(sigch, os.Interrupt)
 	defer signal.Stop(sigch)
 
+	// Create a new node namespace
 	nodeNS := server.NewNodeNameSpace(s, "NodeNamespace")
+	// add it to the server.
 	s.AddNamespace(nodeNS)
+	// Create some nodes for it.
 	var1 := nodeNS.AddNewVariableNode("TestVar1", float32(123.45))
+	// Make sure there is a reference to the variable from the root object folder
 	nns_obj := nodeNS.Objects()
 	nns_obj.AddRef(var1)
+
+	// add the reference for this namespace's root object folder to the server's root object folder
 	root_obj.AddRef(nns_obj)
 
 	log.Printf("Press CTRL-C to exit")
