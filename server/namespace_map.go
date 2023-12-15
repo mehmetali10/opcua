@@ -1,7 +1,6 @@
 package server
 
 import (
-	"strings"
 	"sync"
 	"time"
 
@@ -168,7 +167,8 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 		Status:          ua.StatusBad,
 	}
 
-	key := strip_crap(n.String())
+	key := n.StringID()
+
 	debug.Printf("Read req for %s", key)
 	var err error
 	debug.Printf("'%s' Data at read: %v", ns.name, ns.Data)
@@ -209,6 +209,23 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 		dv.Status = ua.StatusOK
 		dv.EncodingMask |= ua.DataValueValue
 		dv.Value = ua.MustVariant("")
+	}
+
+	if a == ua.AttributeIDBrowseName {
+		dv.Status = ua.StatusOK
+		dv.EncodingMask |= ua.DataValueValue
+		dv.Value = ua.MustVariant(attrs.BrowseName(key))
+	}
+	if a == ua.AttributeIDDisplayName {
+		dv.Status = ua.StatusOK
+		dv.EncodingMask |= ua.DataValueValue
+		dv.Value = ua.MustVariant(attrs.DisplayName(key, key))
+	}
+	if a == ua.AttributeIDAccessLevel {
+		dv.Status = ua.StatusOK
+		dv.EncodingMask |= ua.DataValueValue
+		level := byte(ua.AccessLevelExTypeCurrentWrite | ua.AccessLevelExTypeCurrentRead)
+		dv.Value = ua.MustVariant(level)
 	}
 
 	if a == ua.AttributeIDNodeClass {
@@ -299,7 +316,7 @@ func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *u
 	defer s.Mu.Unlock()
 	debug.Printf("'%s' Data pre-write: %v", s.name, s.Data)
 
-	key := strip_crap(node.StringID())
+	key := node.StringID()
 
 	// we would normally look up the node in our actual address space, but since that's dumb, we're just
 	// going to use the node id directly to look it up from our data map.
@@ -317,14 +334,6 @@ func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *u
 	}
 
 	return ua.StatusOK
-}
-
-func strip_crap(s string) string {
-	seq_pos := strings.LastIndex(s, "s=")
-	if seq_pos < 0 {
-		return s
-	}
-	return s[seq_pos+2:]
 }
 
 func (ns *MapNamespace) Name() string {
