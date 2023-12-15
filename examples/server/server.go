@@ -135,7 +135,7 @@ func main() {
 	signal.Notify(sigch, os.Interrupt)
 	defer signal.Stop(sigch)
 
-	// Create a new node namespace
+	// Create a new node namespace.  You can add namespaces before or after starting the server.
 	nodeNS := server.NewNodeNameSpace(s, "NodeNamespace")
 	// add it to the server.
 	s.AddNamespace(nodeNS)

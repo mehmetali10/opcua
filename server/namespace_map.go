@@ -288,6 +288,8 @@ func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *u
 		s.Data[key] = v
 	}
 
+	s.srv.ChangeNotification(node)
+
 	return ua.StatusOK
 }
 

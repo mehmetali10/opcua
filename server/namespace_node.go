@@ -15,6 +15,7 @@ import (
 
 // the base "node-centric" namespace
 type NodeNameSpace struct {
+	srv             *Server
 	name            string
 	mu              sync.RWMutex
 	nodes           []*Node
@@ -32,6 +33,7 @@ func (ns *NodeNameSpace) GetNextNodeID() uint32 {
 
 func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
 	ns := &NodeNameSpace{
+		srv:   srv,
 		name:  name,
 		nodes: make([]*Node, 0),
 		m:     make(map[string]*Node),
@@ -201,6 +203,7 @@ func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *u
 	if err != nil {
 		return ua.StatusBadAttributeIDInvalid
 	}
+	as.srv.ChangeNotification(id)
 
 	return ua.StatusOK
 }
