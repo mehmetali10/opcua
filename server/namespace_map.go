@@ -210,6 +210,12 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 		dv.EncodingMask |= ua.DataValueValue
 		dv.Value = ua.MustVariant("")
 	}
+
+	if a == ua.AttributeIDNodeClass {
+		dv.Status = ua.StatusOK
+		dv.EncodingMask |= ua.DataValueValue
+		dv.Value = ua.MustVariant(uint32(ua.NodeClassVariable))
+	}
 	// nothing in this namespace has event notifiers
 	if a == ua.AttributeIDEventNotifier {
 		dv.Status = ua.StatusOK
@@ -280,8 +286,9 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 
 	if dv.Value == nil {
 		debug.Printf("bad dv.Value!")
+	} else {
+		debug.Printf("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
 	}
-	debug.Printf("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
 
 	return dv
 }

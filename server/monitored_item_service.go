@@ -98,7 +98,11 @@ func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
 }
 
 func (s *MonitoredItemService) NextID() uint32 {
-	return atomic.AddUint32(&s.id, 1)
+	i := atomic.AddUint32(&s.id, 1)
+	if i == 0 {
+		i = atomic.AddUint32(&s.id, 1)
+	}
+	return i
 }
 
 type MonitoredItem struct {
@@ -169,7 +173,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 			itemreq.RequestedParameters.ClientHandle)
 		res[i] = &ua.MonitoredItemCreateResult{
 			StatusCode:              ua.StatusOK,
-			MonitoredItemID:         uint32(i),
+			MonitoredItemID:         item.ID,
 			RevisedSamplingInterval: sub.RevisedPublishingInterval,
 			RevisedQueueSize:        1,
 			FilterResult:            ua.NewExtensionObject(nil),

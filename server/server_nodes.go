@@ -10,7 +10,7 @@ import (
 
 func CurrentTimeNode() *Node {
 	return NewNode(
-		ua.NewNumericNodeID(0, 2258),
+		ua.NewNumericNodeID(0, id.Server_ServerStatus_CurrentTime),
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("CurrentTime")),
 		},
@@ -21,7 +21,7 @@ func CurrentTimeNode() *Node {
 
 func NamespacesNode(s *Server) *Node {
 	return NewNode(
-		ua.NewNumericNodeID(0, 2255),
+		ua.NewNumericNodeID(0, id.Server_NamespaceArray),
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Namespaces")),
 		},
@@ -39,7 +39,7 @@ func NamespacesNode(s *Server) *Node {
 
 func ServerStatusNode(s *Server) *Node {
 	return NewNode(
-		ua.NewNumericNodeID(0, 2256),
+		ua.NewNumericNodeID(0, id.Server_ServerStatus_State),
 		map[ua.AttributeID]*ua.Variant{
 			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("ServerStatus")),
 		},

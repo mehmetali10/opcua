@@ -56,7 +56,7 @@ func main() {
 
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
-		debug.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
+		log.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
 			log.Printf("Failed to load certificate: %s", err)
