@@ -113,7 +113,28 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 		return nil, err
 	}
 
-	session := s.srv.Session(req.Header())
+	session := s.srv.Session(req.RequestHeader)
+
+	if session == nil {
+		response := &ua.PublishResponse{
+			ResponseHeader: &ua.ResponseHeader{
+				Timestamp:          time.Now(),
+				RequestHandle:      req.RequestHeader.RequestHandle,
+				ServiceResult:      ua.StatusBadSessionIDInvalid,
+				ServiceDiagnostics: &ua.DiagnosticInfo{},
+				StringTable:        []string{},
+				AdditionalHeader:   ua.NewExtensionObject(nil),
+			},
+			SubscriptionID:           0,
+			MoreNotifications:        false,
+			NotificationMessage:      &ua.NotificationMessage{NotificationData: []*ua.ExtensionObject{}},
+			AvailableSequenceNumbers: []uint32{}, // an empty array indicates taht we don't support retransmission of messages
+			Results:                  []ua.StatusCode{},
+			DiagnosticInfos:          []*ua.DiagnosticInfo{},
+		}
+
+		return response, nil
+	}
 
 	select {
 	case session.PublishRequests <- PubReq{Req: req, ID: reqID}:
