@@ -56,6 +56,11 @@ type serverConfig struct {
 	certificate    []byte
 	applicationURI string
 
+	applicationName  string
+	manufacturerName string
+	productName      string
+	softwareVersion  string
+
 	enabledSec  []security
 	enabledAuth []authMode
 
@@ -89,7 +94,11 @@ type security struct {
 // Call Start() afterwards to begin listening and serving connections
 func New(url string, opts ...Option) *Server {
 	cfg := &serverConfig{
-		cap: capabilities,
+		cap:              capabilities,
+		applicationName:  "GOPCUA",               // override with the ServerName option
+		manufacturerName: "The gopcua Team",      // override with the ManufacturerName option
+		productName:      "gopcua OPC/UA Server", // override with the ProductName option
+		softwareVersion:  "0.0.0-dev",            // override with the SoftwareVersion option
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -109,8 +118,8 @@ func New(url string, opts ...Option) *Server {
 			State:       ua.ServerStateSuspended,
 			BuildInfo: &ua.BuildInfo{
 				ProductURI:       "https://github.com/gopcua/opcua",
-				ManufacturerName: "The gopcua Team",
-				ProductName:      "gopcua OPC/UA Server",
+				ManufacturerName: cfg.manufacturerName,
+				ProductName:      cfg.productName,
 				SoftwareVersion:  "0.0.0-dev",
 				BuildNumber:      "",
 				BuildDate:        time.Time{},
@@ -333,7 +342,7 @@ func (s *Server) initEndpoints() {
 				ProductURI:     "urn:github.com:gopcua:server",
 				ApplicationName: &ua.LocalizedText{
 					EncodingMask: ua.LocalizedTextText,
-					Text:         "GOPCUA",
+					Text:         s.cfg.applicationName,
 				},
 				ApplicationType:     ua.ApplicationTypeServer,
 				GatewayServerURI:    "",

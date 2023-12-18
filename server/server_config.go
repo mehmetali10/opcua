@@ -109,3 +109,27 @@ func defaultChannelConfig() *uasc.Config {
 		Lifetime:          uint32(time.Hour / time.Millisecond),
 	}
 }
+
+func ServerName(name string) Option {
+	return func(s *serverConfig) {
+		s.applicationName = name
+	}
+}
+
+func ManufacturerName(name string) Option {
+	return func(s *serverConfig) {
+		s.manufacturerName = name
+	}
+}
+
+func ProductName(name string) Option {
+	return func(s *serverConfig) {
+		s.productName = name
+	}
+}
+
+func SoftwareVersion(name string) Option {
+	return func(s *serverConfig) {
+		s.softwareVersion = name
+	}
+}
