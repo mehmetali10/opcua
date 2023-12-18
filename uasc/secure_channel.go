@@ -195,7 +195,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 	return s, nil
 }
 
-func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errch chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
+func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
@@ -228,7 +228,7 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKi
 		// securityTokenID: securityTokenID,
 		reqLocker:    newConditionLocker(),
 		rcvLocker:    newConditionLocker(),
-		errch:        errch,
+		errch:        errCh,
 		closing:      make(chan struct{}),
 		disconnected: make(chan struct{}),
 		instances:    make(map[uint32][]*channelInstance),
@@ -943,11 +943,11 @@ func (s *SecureChannel) Renew(ctx context.Context) error {
 }
 
 // SendRequest sends the service request and calls h with the response.
-func (s *SecureChannel) SendRequest(ctx context.Context, req ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequest(ctx context.Context, req ua.Request, authToken *ua.NodeID, h ResponseHandler) error {
 	return s.SendRequestWithTimeout(ctx, req, authToken, s.cfg.RequestTimeout, h)
 }
 
-func (s *SecureChannel) SendRequestWithTimeout(ctx context.Context, req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequestWithTimeout(ctx context.Context, req ua.Request, authToken *ua.NodeID, timeout time.Duration, h ResponseHandler) error {
 	s.reqLocker.waitIfLock()
 	active, err := s.getActiveChannelInstance()
 	if err != nil {
