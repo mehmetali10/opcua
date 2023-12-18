@@ -20,6 +20,25 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/tag/gopcua/opcua.svg?color=blue&label=version)](https://github.com/gopcua/opcua/releases)
 
+## v0.5.x BREAKING CHANGES
+
+* `v0.5.0` released on 14 Aug 2023: all `Client` methods must have a context
+* `v0.5.1` released on 22 Aug 2023: the `NewClient` function returns an error
+
+In `v0.3.0` on 21 Jan 2022 release we added `WithContext` variants for all methods
+to avoid a breaking change. All existing methods without a context had a disclaimer
+that with `v0.5.0` their signature would change to include the context
+and that the `WithContext` method would be removed. 
+
+We missed to update the `NewClient` function in `v0.5.0` which was fixed
+in `v0.5.1`.
+
+Please update your code and let us know if there are any issues!
+
+Thank you!
+
+Your GOPCUA Team
+
 ## Quickstart
 
 ```sh
@@ -150,49 +169,49 @@ The current focus is on the OPC UA Binary protocol over TCP. No other protocols 
 
 ### Services
 
-The current set of supported services is only for the high-level client.
+Here is the current set of supported services. For low-level access use the client `Send` function directly.
 
-| Service Set                 | Service                       | Supported | Notes        |
-|-----------------------------|-------------------------------|-----------|--------------|
-| Discovery Service Set       | FindServers                   |           |              |
-|                             | FindServersOnNetwork          |           |              |
-|                             | GetEndpoints                  | Yes       |              |
-|                             | RegisterServer                |           |              |
-|                             | RegisterServer2               |           |              |
-| Secure Channel Service Set  | OpenSecureChannel             | Yes       |              |
-|                             | CloseSecureChannel            | Yes       |              |
-| Session Service Set         | CreateSession                 | Yes       |              |
-|                             | CloseSession                  | Yes       |              |
-|                             | ActivateSession               | Yes       |              |
-|                             | Cancel                        |           |              |
-| Node Management Service Set | AddNodes                      |           |              |
-|                             | AddReferences                 |           |              |
-|                             | DeleteNodes                   |           |              |
-|                             | DeleteReferences              |           |              |
-| View Service Set            | Browse                        | Yes       |              |
-|                             | BrowseNext                    | Yes       |              |
-|                             | TranslateBrowsePathsToNodeIds |           |              |
-|                             | RegisterNodes                 | Yes       |              |
-|                             | UnregisterNodes               | Yes       |              |
-| Query Service Set           | QueryFirst                    |           |              |
-|                             | QueryNext                     |           |              |
-| Attribute Service Set       | Read                          | Yes       |              |
-|                             | Write                         | Yes       |              |
-|                             | HistoryRead                   | Yes       |              |
-|                             | HistoryUpdate                 |           |              |
-| Method Service Set          | Call                          | Yes       |              |
-| MonitoredItems Service Set  | CreateMonitoredItems          | Yes       |              |
-|                             | DeleteMonitoredItems          | Yes       |              |
-|                             | ModifyMonitoredItems          | Yes       |              |
-|                             | SetMonitoringMode             |           |              |
-|                             | SetTriggering                 |           |              |
-| Subscription Service Set    | CreateSubscription            | Yes       |              |
-|                             | ModifySubscription            |           |              |
-|                             | SetPublishingMode             |           |              |
-|                             | Publish                       | Yes       |              |
-|                             | Republish                     |           |              |
-|                             | DeleteSubscriptions           | Yes       |              |
-|                             | TransferSubscriptions         |           |              |
+| Service Set                 | Service                       | Client | Notes        |
+|-----------------------------|-------------------------------|--------|--------------|
+| Discovery Service Set       | FindServers                   | Yes    |              |
+|                             | FindServersOnNetwork          | Yes    |              |
+|                             | GetEndpoints                  | Yes    |              |
+|                             | RegisterServer                |        |              |
+|                             | RegisterServer2               |        |              |
+| Secure Channel Service Set  | OpenSecureChannel             | Yes    |              |
+|                             | CloseSecureChannel            | Yes    |              |
+| Session Service Set         | CreateSession                 | Yes    |              |
+|                             | CloseSession                  | Yes    |              |
+|                             | ActivateSession               | Yes    |              |
+|                             | Cancel                        |        |              |
+| Node Management Service Set | AddNodes                      |        |              |
+|                             | AddReferences                 |        |              |
+|                             | DeleteNodes                   |        |              |
+|                             | DeleteReferences              |        |              |
+| View Service Set            | Browse                        | Yes    |              |
+|                             | BrowseNext                    | Yes    |              |
+|                             | TranslateBrowsePathsToNodeIds |        |              |
+|                             | RegisterNodes                 | Yes    |              |
+|                             | UnregisterNodes               | Yes    |              |
+| Query Service Set           | QueryFirst                    |        |              |
+|                             | QueryNext                     |        |              |
+| Attribute Service Set       | Read                          | Yes    |              |
+|                             | Write                         | Yes    |              |
+|                             | HistoryRead                   | Yes    |              |
+|                             | HistoryUpdate                 |        |              |
+| Method Service Set          | Call                          | Yes    |              |
+| MonitoredItems Service Set  | CreateMonitoredItems          | Yes    |              |
+|                             | DeleteMonitoredItems          | Yes    |              |
+|                             | ModifyMonitoredItems          | Yes    |              |
+|                             | SetMonitoringMode             |        |              |
+|                             | SetTriggering                 |        |              |
+| Subscription Service Set    | CreateSubscription            | Yes    |              |
+|                             | ModifySubscription            |        |              |
+|                             | SetPublishingMode             |        |              |
+|                             | Publish                       | Yes    |              |
+|                             | Republish                     |        |              |
+|                             | DeleteSubscriptions           | Yes    |              |
+|                             | TransferSubscriptions         |        |              |
 
 ## Authors
 

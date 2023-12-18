@@ -60,15 +60,18 @@ func main() {
 		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous),
 	}
 
-	c := opcua.NewClient(ep.EndpointURL, opts...)
+	c, err := opcua.NewClient(ep.EndpointURL, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	notifyCh := make(chan *opcua.PublishNotificationData)
 
-	sub, err := c.SubscribeWithContext(ctx, &opcua.SubscriptionParameters{
+	sub, err := c.Subscribe(ctx, &opcua.SubscriptionParameters{
 		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
@@ -89,7 +92,7 @@ func main() {
 	} else {
 		miCreateRequest = valueRequest(id)
 	}
-	res, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequest)
+	res, err := sub.Monitor(ctx, ua.TimestampsToReturnBoth, miCreateRequest)
 	if err != nil || res.Results[0].StatusCode != ua.StatusOK {
 		log.Fatal(err)
 	}

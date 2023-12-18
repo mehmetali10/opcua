@@ -204,19 +204,17 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKi
 		return nil, errors.Errorf("no secure channel config")
 	}
 
-	if cfg.SecurityPolicyURI != ua.SecurityPolicyURINone {
-		if cfg.SecurityMode == ua.MessageSecurityModeNone {
-			return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
-		}
-		if cfg.LocalKey == nil {
-			return nil, errors.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
-		}
+	if errCh == nil {
+		return nil, errors.Errorf("no error channel")
 	}
 
-	// Force the security mode to None if the policy is also None
-	// TODO: I don't like that a SecureChannel changes the incoming config
-	if cfg.SecurityPolicyURI == ua.SecurityPolicyURINone {
-		cfg.SecurityMode = ua.MessageSecurityModeNone
+	switch {
+	case cfg.SecurityPolicyURI == ua.SecurityPolicyURINone && cfg.SecurityMode != ua.MessageSecurityModeNone:
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.SecurityMode == ua.MessageSecurityModeNone:
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.LocalKey == nil:
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
 	}
 
 	s := &SecureChannel{
@@ -945,27 +943,11 @@ func (s *SecureChannel) Renew(ctx context.Context) error {
 }
 
 // SendRequest sends the service request and calls h with the response.
-// Deprecated: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h ResponseHandler) error {
-	return s.SendRequestWithContext(context.Background(), req, authToken, h)
+func (s *SecureChannel) SendRequest(ctx context.Context, req ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+	return s.SendRequestWithTimeout(ctx, req, authToken, s.cfg.RequestTimeout, h)
 }
 
-// Note: This method will be replaced by the non "WithContext()" version
-// of this method.
-func (s *SecureChannel) SendRequestWithContext(ctx context.Context, req ua.Request, authToken *ua.NodeID, h ResponseHandler) error {
-	return s.SendRequestWithTimeoutWithContext(ctx, req, authToken, s.cfg.RequestTimeout, h)
-}
-
-// Deprecated: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h ResponseHandler) error {
-	return s.SendRequestWithTimeoutWithContext(context.Background(), req, authToken, timeout, h)
-}
-
-// Note: This method will be replaced by the non "WithContext()" version
-// of this method.
-func (s *SecureChannel) SendRequestWithTimeoutWithContext(ctx context.Context, req ua.Request, authToken *ua.NodeID, timeout time.Duration, h ResponseHandler) error {
+func (s *SecureChannel) SendRequestWithTimeout(ctx context.Context, req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
 	s.reqLocker.waitIfLock()
 	active, err := s.getActiveChannelInstance()
 	if err != nil {
@@ -1186,7 +1168,7 @@ func (s *SecureChannel) close() error {
 	default:
 	}
 
-	err := s.SendRequestWithContext(context.Background(), &ua.CloseSecureChannelRequest{}, nil, nil)
+	err := s.SendRequest(context.Background(), &ua.CloseSecureChannelRequest{}, nil, nil)
 	if err != nil {
 		return err
 	}

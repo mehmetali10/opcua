@@ -2,6 +2,7 @@ package uasc
 
 import (
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,6 +10,10 @@ import (
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/uapolicy"
+	"github.com/gopcua/opcua/uatest"
+	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestNewRequestMessage(t *testing.T) {
@@ -139,7 +144,7 @@ func TestNewRequestMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m, err := tt.sechan.activeInstance.newRequestMessage(tt.req, tt.sechan.nextRequestID(), tt.authToken, tt.timeout)
 			if err != nil {
-				t.Fatalf("got err %v want nil", err)
+				t.Fatal(err)
 			}
 			verify.Values(t, "", m, tt.m)
 		})
@@ -151,21 +156,27 @@ func TestNewRequestMessage(t *testing.T) {
 // 	buildSecPolicy := func(bits int, uri string) *uapolicy.EncryptionAlgorithm {
 // 		t.Helper()
 
-// 		certPEM, keyPEM, err := uatest.GenerateCert("localhost", bits, 24*time.Hour)
-// 		block, _ := pem.Decode(keyPEM)
-// 		pk, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		certblock, _ := pem.Decode(certPEM)
-// 		remoteX509Cert, err := x509.ParseCertificate(certblock.Bytes)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
-// 		alg, _ := uapolicy.Asymmetric(uri, pk, remoteKey)
-// 		return alg
-// 	}
+		certPEM, keyPEM, err := uatest.GenerateCert("localhost", bits, 24*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		block, _ := pem.Decode(keyPEM)
+		pk, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		certblock, _ := pem.Decode(certPEM)
+		remoteX509Cert, err := x509.ParseCertificate(certblock.Bytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
+		alg, _ := uapolicy.Asymmetric(uri, pk, remoteKey)
+		return alg
+	}
 
 // 	getConfig := func(uri string) *Config {
 // 		t.Helper()
@@ -293,10 +304,50 @@ func TestNewRequestMessage(t *testing.T) {
 // 				t.Fatalf("error: message decrypt: %v", err)
 // 			}
 
-// 			headerLength := 12 + m.AsymmetricSecurityHeader.Len()
-// 			if got, want := plain, tt.b[headerLength:]; !bytes.Equal(got, want) {
-// 				t.Fatalf("got bytes %v want %v", got, want)
-// 			}
-// 		})
-// 	}
-// }
+			headerLength := 12 + m.AsymmetricSecurityHeader.Len()
+			if got, want := plain, tt.b[headerLength:]; !bytes.Equal(got, want) {
+				t.Fatalf("got bytes %v want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestNewSecureChannel(t *testing.T) {
+	t.Run("no connection", func(t *testing.T) {
+		_, err := NewSecureChannel("", nil, nil, nil)
+		errorContains(t, err, "no connection")
+	})
+	t.Run("no error channel", func(t *testing.T) {
+		_, err := NewSecureChannel("", &uacp.Conn{}, nil, nil)
+		errorContains(t, err, "no secure channel config")
+	})
+	t.Run("no config", func(t *testing.T) {
+		_, err := NewSecureChannel("", &uacp.Conn{}, nil, make(chan error))
+		errorContains(t, err, "no secure channel config")
+	})
+	t.Run("uri none, mode not none", func(t *testing.T) {
+		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURINone, SecurityMode: ua.MessageSecurityModeSign}
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		errorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#None' cannot be used with 'MessageSecurityModeSign'")
+	})
+	t.Run("uri not none, mode none", func(t *testing.T) {
+		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeNone}
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		errorContains(t, err, "Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' cannot be used with 'MessageSecurityModeNone'")
+	})
+	t.Run("uri not none, local key missing", func(t *testing.T) {
+		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeSign}
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		errorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' requires a private key")
+	})
+}
+
+func errorContains(t *testing.T, err error, msg string) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected an error but got nil")
+	}
+	if !strings.Contains(err.Error(), msg) {
+		t.Fatalf("error '%s' does not contain '%s'", err, msg)
+	}
+}

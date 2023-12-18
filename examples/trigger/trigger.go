@@ -59,15 +59,18 @@ func main() {
 		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous),
 	}
 
-	c := opcua.NewClient(ep.EndpointURL, opts...)
+	c, err := opcua.NewClient(ep.EndpointURL, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	notifyCh := make(chan *opcua.PublishNotificationData)
 
-	sub, err := c.Subscribe(&opcua.SubscriptionParameters{
+	sub, err := c.Subscribe(ctx, &opcua.SubscriptionParameters{
 		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
@@ -105,13 +108,13 @@ func main() {
 		},
 	}
 
-	subRes, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequests...)
+	subRes, err := sub.Monitor(ctx, ua.TimestampsToReturnBoth, miCreateRequests...)
 	if err != nil || subRes.Results[0].StatusCode != ua.StatusOK {
 		log.Fatal(err)
 	}
 
 	triggeringServerID, triggeredServerID := subRes.Results[0].MonitoredItemID, subRes.Results[1].MonitoredItemID
-	tRes, err := sub.SetTriggering(triggeringServerID, []uint32{triggeredServerID}, nil)
+	tRes, err := sub.SetTriggering(ctx, triggeringServerID, []uint32{triggeredServerID}, nil)
 
 	if err != nil {
 		log.Fatal(err)

@@ -1,9 +1,35 @@
 # Changelog
 
-## Unreleased
+## v0.5.2 (18 Oct 2023)
+
+* feat(encode): print written hex on debugCodec flag (#685)
+* fix: ReferenceNodes usage with mask set (#683)
+* Empty policyURI fallback on SecureChannel SecurityPolicyURI (#669)
+* feat: add support for AuthPrivateKey (#681)
+* Fixed panic if h.MessageSize < hdrlen bytes. (#692)
+* Problem with using ReferencedNodes (#682)
+* Running examples/browse.go returns EOF error (#550)
+* Empty session policyURI (#668)
+* Failed to open a secure channel with AuthCertificate and different certificates (#671)
+
+## v0.5.1 (22 Aug 2023)
+
+* refactor: make NewClient return an error (#674)
+* feat: add support for FindServers and FindServersOnNetwork (#675)
+* Readme: adjust Services section (#676)
+* Update github actions (#677)
+
+## v0.5.0 (14 Aug 2023)
+
+* Drop WithContext methods and require all methods to have a context (#554)
+
+## v0.4.1 (14 Aug 2023)
 
 * Update the schema to v1.05.02-2022-11-01 and regenerate code (#589)
 * fix: handle extra padding if key length > 2048 (#648)
+* Add B&R Automation PC 3100 to the list of equipments (#663)
+* uasc: return an error for invalid uri/mode combinations with None (#664)
+* go1.21 and python3.11 (for testing)
 
 ## v0.4.0 (13 Jun 2023)
 

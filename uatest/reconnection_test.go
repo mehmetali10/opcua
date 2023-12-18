@@ -27,11 +27,14 @@ func TestAutoReconnection(t *testing.T) {
 	srv := NewPythonServer("reconnection_server.py")
 	defer srv.Close()
 
-	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	m, err := monitor.NewNodeMonitor(c)
 	if err != nil {
@@ -103,7 +106,7 @@ func TestAutoReconnection(t *testing.T) {
 
 			downC := make(chan struct{}, 1)
 			dTimeout := time.NewTimer(disconnectTimeout)
-			go c.CallWithContext(ctx, tt.req)
+			go c.Call(ctx, tt.req)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			go func() {

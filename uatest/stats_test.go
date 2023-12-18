@@ -28,12 +28,14 @@ func TestStats(t *testing.T) {
 	srv := NewPythonServer("rw_server.py")
 	defer srv.Close()
 
-	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-
-	c.CloseWithContext(ctx)
+	c.Close(ctx)
 
 	want := map[string]*expvar.Int{
 		"Dial":             newExpVarInt(1),

@@ -33,11 +33,14 @@ func TestRead(t *testing.T) {
 	srv := NewPythonServer("rw_server.py")
 	defer srv.Close()
 
-	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	for _, tt := range tests {
 		t.Run(tt.id.String(), func(t *testing.T) {
@@ -54,7 +57,7 @@ func TestRead(t *testing.T) {
 func testRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{}, id *ua.NodeID) {
 	t.Helper()
 
-	resp, err := c.ReadWithContext(ctx, &ua.ReadRequest{
+	resp, err := c.Read(ctx, &ua.ReadRequest{
 		NodesToRead: []*ua.ReadValueID{
 			&ua.ReadValueID{NodeID: id},
 		},
@@ -74,7 +77,7 @@ func testRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{},
 func testRegisteredRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{}, id *ua.NodeID) {
 	t.Helper()
 
-	resp, err := c.RegisterNodesWithContext(ctx, &ua.RegisterNodesRequest{
+	resp, err := c.RegisterNodes(ctx, &ua.RegisterNodesRequest{
 		NodesToRegister: []*ua.NodeID{id},
 	})
 	if err != nil {
@@ -87,7 +90,7 @@ func testRegisteredRead(t *testing.T, ctx context.Context, c *opcua.Client, v in
 	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
 	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
 
-	_, err = c.UnregisterNodesWithContext(ctx, &ua.UnregisterNodesRequest{
+	_, err = c.UnregisterNodes(ctx, &ua.UnregisterNodesRequest{
 		NodesToUnregister: []*ua.NodeID{id},
 	})
 	if err != nil {

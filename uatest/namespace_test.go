@@ -18,14 +18,17 @@ func TestNamespace(t *testing.T) {
 	srv := NewPythonServer("rw_server.py")
 	defer srv.Close()
 
-	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	t.Run("NamespaceArray", func(t *testing.T) {
-		got, err := c.NamespaceArrayWithContext(ctx)
+		got, err := c.NamespaceArray(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +40,7 @@ func TestNamespace(t *testing.T) {
 		verify.Values(t, "", got, want)
 	})
 	t.Run("FindNamespace", func(t *testing.T) {
-		ns, err := c.FindNamespaceWithContext(ctx, "http://gopcua.com/")
+		ns, err := c.FindNamespace(ctx, "http://gopcua.com/")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -46,7 +49,7 @@ func TestNamespace(t *testing.T) {
 		}
 	})
 	t.Run("UpdateNamespaces", func(t *testing.T) {
-		err := c.UpdateNamespacesWithContext(ctx)
+		err := c.UpdateNamespaces(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

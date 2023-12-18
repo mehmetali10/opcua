@@ -20,16 +20,19 @@ func TestReadUnknowNodeID(t *testing.T) {
 	srv := NewPythonServer("read_unknow_node_id_server.py")
 	defer srv.Close()
 
-	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	// read node with unknown extension object
 	// This should be OK
 	nodeWithUnknownType := ua.NewStringNodeID(2, "IntValZero")
-	resp, err := c.Read(&ua.ReadRequest{
+	resp, err := c.Read(ctx, &ua.ReadRequest{
 		NodesToRead: []*ua.ReadValueID{
 			{NodeID: nodeWithUnknownType},
 		},
@@ -43,7 +46,7 @@ func TestReadUnknowNodeID(t *testing.T) {
 	}
 
 	// check that the connection is still usable by reading another node.
-	_, err = c.ReadWithContext(ctx, &ua.ReadRequest{
+	_, err = c.Read(ctx, &ua.ReadRequest{
 		NodesToRead: []*ua.ReadValueID{
 			{
 				NodeID: ua.NewNumericNodeID(0, id.Server_ServerStatus_State),
