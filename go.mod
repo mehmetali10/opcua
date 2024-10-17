@@ -1,4 +1,4 @@
-module github.com/gopcua/opcua
+module github.com/mehmetali10/opcua
 
 go 1.20
 
@@ -16,3 +16,5 @@ retract (
 	v0.2.5 // https://github.com/gopcua/opcua/issues/538
 	v0.2.4 // https://github.com/gopcua/opcua/issues/538
 )
+
+replace github.com/gopcua/opcua => github.com/mehmetali10/opcua v1.0.0
